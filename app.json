@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "LibreTV Mobile",
+    "slug": "libretv-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
+    },
+    "android": {
+      "usesCleartextTraffic": true,
+      "adaptiveIcon": {
+        "backgroundColor": "#050505"
+      },
+      "package": "com.anonymous.libretvmobile"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "9afc627f-d09c-4dbd-b624-5aff9b65ca1d"
+      }
+    }
+  }
+}

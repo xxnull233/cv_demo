@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "LibreTV Mobile",
+    "name": "CMSTV",
     "slug": "libretv-mobile",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -13,15 +13,17 @@
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
-        }
-      }
+        },
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.anonymous.cmstv"
     },
     "android": {
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#050505"
       },
-      "package": "com.anonymous.libretvmobile"
+      "package": "com.anonymous.cmstv"
     },
     "extra": {
       "eas": {

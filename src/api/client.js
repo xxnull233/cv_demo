@@ -1,8 +1,14 @@
-import { API_HEADERS, API_SITES } from "./sites";
+﻿import { Platform } from "react-native";
+import { API_HEADERS, PROXY_BASE_URL } from "./sites";
+import {
+  linesFromText,
+  parseLinesFromPlayUrl,
+  stripHtml,
+  uniqueBy
+} from "./parsers";
 
 const SEARCH_TIMEOUT = 9000;
 const DETAIL_TIMEOUT = 10000;
-const M3U8_PATTERN = /\$?(https?:\/\/[^"'\s]+?\.m3u8[^"'\s]*)/g;
 
 function withTimeout(ms) {
   const controller = new AbortController();
@@ -10,25 +16,16 @@ function withTimeout(ms) {
   return { controller, timeoutId };
 }
 
-function stripHtml(value = "") {
-  return String(value)
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function uniqueBy(items, getKey) {
-  const seen = new Set();
-  return items.filter((item) => {
-    const key = getKey(item);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
 function normalizeApiBase(url) {
   return url.replace(/\/+$/, "");
+}
+
+// 在 Web 平台通过本地代理转发，绕过 CORS 限制
+function resolveUrl(targetUrl) {
+  if (Platform.OS === "web") {
+    return `${PROXY_BASE_URL}?url=${encodeURIComponent(targetUrl)}`;
+  }
+  return targetUrl;
 }
 
 function getSearchUrl(site, query, page = 1) {
@@ -45,7 +42,7 @@ function getDetailUrl(site, id) {
 async function fetchJson(url, timeout) {
   const { controller, timeoutId } = withTimeout(timeout);
   try {
-    const response = await fetch(url, {
+    const response = await fetch(resolveUrl(url), {
       headers: API_HEADERS,
       signal: controller.signal
     });
@@ -61,7 +58,7 @@ async function fetchJson(url, timeout) {
 async function fetchText(url, timeout) {
   const { controller, timeoutId } = withTimeout(timeout);
   try {
-    const response = await fetch(url, {
+    const response = await fetch(resolveUrl(url), {
       headers: { Accept: "text/html,*/*" },
       signal: controller.signal
     });
@@ -74,8 +71,8 @@ async function fetchText(url, timeout) {
   }
 }
 
-export async function searchSource(sourceKey, query) {
-  const site = API_SITES[sourceKey];
+export async function searchSource(sourceKey, query, sourceMap) {
+  const site = sourceMap?.[sourceKey];
   if (!site || !query.trim()) return [];
 
   try {
@@ -98,39 +95,12 @@ export async function searchSource(sourceKey, query) {
   }
 }
 
-export async function searchManySources(sourceKeys, query) {
-  const batches = await Promise.all(sourceKeys.map((key) => searchSource(key, query)));
+export async function searchManySources(sourceKeys, query, sourceMap) {
+  const batches = await Promise.all(
+    sourceKeys.map((key) => searchSource(key, query, sourceMap))
+  );
   const merged = batches.flat();
   return uniqueBy(merged, (item) => `${item.sourceKey}:${item.id}`);
-}
-
-function parseEpisodesFromPlayUrl(playUrl = "") {
-  if (!playUrl) return [];
-  const firstSource = String(playUrl).split("$$$")[0] || "";
-  return firstSource
-    .split("#")
-    .map((episode, index) => {
-      const parts = episode.split("$");
-      const title = parts.length > 1 ? parts[0] : `第 ${index + 1} 集`;
-      const url = parts.length > 1 ? parts[1] : parts[0];
-      return {
-        title: title || `第 ${index + 1} 集`,
-        url: (url || "").trim()
-      };
-    })
-    .filter((episode) => /^https?:\/\//.test(episode.url));
-}
-
-function parseEpisodesFromText(text = "") {
-  const matches = [];
-  let match;
-  while ((match = M3U8_PATTERN.exec(text))) {
-    matches.push({
-      title: `第 ${matches.length + 1} 集`,
-      url: match[1].replace(/[),]+$/, "")
-    });
-  }
-  return uniqueBy(matches, (episode) => episode.url);
 }
 
 async function loadHtmlDetail(site, id, sourceKey) {
@@ -140,19 +110,21 @@ async function loadHtmlDetail(site, id, sourceKey) {
   const html = await fetchText(detailUrl, DETAIL_TIMEOUT);
   const title = html.match(/<h1[^>]*>([^<]+)<\/h1>/i)?.[1]?.trim() || "";
   const desc = html.match(/<div[^>]*class=["']sketch["'][^>]*>([\s\S]*?)<\/div>/i)?.[1] || "";
+  const lines = linesFromText(html);
 
   return {
     title,
     desc: stripHtml(desc),
     sourceKey,
     sourceName: site.name,
-    episodes: parseEpisodesFromText(html),
+    lines,
+    episodes: lines[0]?.episodes || [],
     detailUrl
   };
 }
 
-export async function loadDetail(result) {
-  const site = API_SITES[result.sourceKey];
+export async function loadDetail(result, sourceMap) {
+  const site = sourceMap?.[result.sourceKey];
   if (!site) throw new Error("资源不存在");
 
   try {
@@ -160,10 +132,11 @@ export async function loadDetail(result) {
     const item = Array.isArray(data?.list) ? data.list[0] : null;
     if (!item) throw new Error("详情为空");
 
-    let episodes = parseEpisodesFromPlayUrl(item.vod_play_url);
-    if (episodes.length === 0) {
-      episodes = parseEpisodesFromText(item.vod_content || "");
+    let lines = parseLinesFromPlayUrl(item.vod_play_url, item.vod_play_from);
+    if (lines.length === 0) {
+      lines = linesFromText(item.vod_content || "");
     }
+    const episodes = lines[0]?.episodes || [];
 
     return {
       title: item.vod_name || result.title,
@@ -176,6 +149,7 @@ export async function loadDetail(result) {
       director: item.vod_director || "",
       sourceKey: result.sourceKey,
       sourceName: site.name,
+      lines,
       episodes,
       detailUrl: getDetailUrl(site, result.id)
     };

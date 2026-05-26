@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState } from "react";
+﻿import { createContext, useContext, useEffect, useState } from "react";
 
-import { clearHistory, loadHistory, saveHistoryItem } from "../storage";
+import { clearHistory, loadHistory, saveHistoryItem, updateHistoryProgress } from "../storage";
 
 const HistoryContext = createContext(null);
 
@@ -23,13 +23,19 @@ export function HistoryProvider({ children }) {
     return next;
   }
 
+  async function updateProgress(id, sourceKey, progress) {
+    const next = await updateHistoryProgress(id, sourceKey, progress);
+    setHistory(next);
+    return next;
+  }
+
   async function clearAllHistory() {
     await clearHistory();
     setHistory([]);
   }
 
   return (
-    <HistoryContext.Provider value={{ history, addHistoryItem, clearAllHistory }}>
+    <HistoryContext.Provider value={{ history, addHistoryItem, updateProgress, clearAllHistory }}>
       {children}
     </HistoryContext.Provider>
   );

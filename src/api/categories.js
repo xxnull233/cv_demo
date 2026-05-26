@@ -1,27 +1,9 @@
-import { Platform } from "react-native";
-import { API_HEADERS, PROXY_BASE_URL } from "./sites";
+﻿import { API_HEADERS } from "./sites";
+import { resolveUrl, withTimeout, normalizeApiBase } from "./utils";
 import { stripHtml } from "./parsers";
 
 const CLASS_TIMEOUT = 8000;
 const VIDEO_LIST_TIMEOUT = 10000;
-
-function withTimeout(ms) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), ms);
-  return { controller, timeoutId };
-}
-
-function normalizeApiBase(url) {
-  return url.replace(/\/+$/, "");
-}
-
-// Web browser CORS workaround - fetch via proxy
-function resolveUrl(targetUrl) {
-  if (Platform.OS === "web") {
-    return `${PROXY_BASE_URL}?url=${encodeURIComponent(targetUrl)}`;
-  }
-  return targetUrl;
-}
 
 /**
  * 获取指定资源站的分类列表
@@ -30,7 +12,7 @@ function resolveUrl(targetUrl) {
  */
 export async function fetchCategories(site) {
   const base = normalizeApiBase(site.api);
-  const url = `${base}?ac=class`;
+  const url = base + "?ac=class";
 
   const { controller, timeoutId } = withTimeout(CLASS_TIMEOUT);
   try {
@@ -38,7 +20,7 @@ export async function fetchCategories(site) {
       headers: API_HEADERS,
       signal: controller.signal
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) throw new Error("HTTP " + response.status);
 
     const text = await response.text();
     const data = JSON.parse(text);
@@ -64,7 +46,7 @@ export async function fetchCategories(site) {
  */
 export async function fetchCategoryVideos(site, classId, siteKey, page = 1) {
   const base = normalizeApiBase(site.api);
-  const url = `${base}?ac=videolist&t=${classId}&pg=${page}`;
+  const url = base + "?ac=videolist&t=" + classId + "&pg=" + page;
 
   const { controller, timeoutId } = withTimeout(VIDEO_LIST_TIMEOUT);
   try {
@@ -72,7 +54,7 @@ export async function fetchCategoryVideos(site, classId, siteKey, page = 1) {
       headers: API_HEADERS,
       signal: controller.signal
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) throw new Error("HTTP " + response.status);
 
     const text = await response.text();
     const data = JSON.parse(text);

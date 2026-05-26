@@ -1,6 +1,6 @@
-# CV Mobile
+﻿# CV Mobile
 
-Expo 移动端应用（iOS / Android / Web）。直连苹果 CMS10 采集站 API，不依赖 Express `/proxy` 后端。
+Expo 移动端应用（iOS / Android / Web），直连 CMS10 采集站 API，不依赖后端代理层。
 
 ## 运行
 
@@ -11,9 +11,7 @@ npm start
 ```
 
 使用 Expo Go、Android 模拟器或 iOS 模拟器打开。
-
 网络受限时可离线启动：
-
 ```bash
 npm start -- --offline
 ```
@@ -21,13 +19,11 @@ npm start -- --offline
 ### Web 端
 
 Web 端会自动启动本地 CORS 代理，再打开 Expo：
-
 ```bash
 npm run web
 ```
 
 仅启动 Expo Web（不启代理）：
-
 ```bash
 npm run web:direct
 ```
@@ -58,7 +54,9 @@ npm run check            # Babel 编译检查 + 播放地址解析检查
 ### 播放
 
 - 解析 `vod_play_url` 中的 HLS（`.m3u8`）地址
-- 使用 `expo-av` 播放，支持多线路切换、选集、倍速
+- 使用 `expo-video` 播放，支持多线路切换、选集
+- **广告过滤**（Web / 移动端各有不同方案，见下方说明）
+- 保存播放进度，再次打开时自动续播
 
 ### 观看历史
 
@@ -67,7 +65,7 @@ npm run check            # Babel 编译检查 + 播放地址解析检查
 
 ### 收藏夹
 
-- 点击搜索结果旁的 ♡ 收藏，弹出收藏夹选择面板
+- 点击搜索结果旁的 ♥ 收藏，弹出收藏夹选择面板
 - 支持新建收藏夹、记住上次使用的收藏夹
 - 同一视频仅存在于一个收藏夹内（换夹即移动）
 - 首页「收藏」进入管理：查看文件夹、删除、取消收藏
@@ -79,36 +77,56 @@ npm run check            # Babel 编译检查 + 播放地址解析检查
 - 支持添加、编辑、删除**自定义 CMS 源**（名称、API、可选 HTML 详情页地址）
 - 自定义源自动加入搜索与分类列表
 
-## 平台说明
+## 平台说明与播放架构
 
-| 平台 | 网络请求 | 备注 |
-|------|----------|------|
-| iOS / Android | 直连 API | 无浏览器 CORS 限制 |
-| Web | 经 `localhost:19001` 代理转发 | 由 `npm run web` 自动启动 |
+| 平台 | m3u8 广告过滤方式 | 播放引擎 |
+|------|-----------------|---------|
+| iOS / Android | 本地过滤：`fetch`→`filterSegmentsText`→写入缓存 `file://` | expo-video（AVPlayer / ExoPlayer） |
+| Web（Chrome / Firefox / Edge） | 本地代理过滤：`localhost:19001/m3u8?url=...` | hls.js（通过 MediaSource API） |
+| Web（Safari） | 本地代理过滤：同上 | 原生 `<video>` HLS |
 
-其他说明：
+### 广告过滤说明
+
+**移动端**：App 内部下载原始 m3u8，经 `src/utils/m3u8Filter.js` 解析 → 检测广告段 → 删除 → 所有 URL 展开为绝对路径 → 写入 `expo-file-system` 缓存目录 → `file://` URI 喂给播放器。切换剧集或退出播放页时自动清理缓存文件，App 启动时也会扫尾清理。
+
+**Web 端**：启动 Expo 时一并启动本地代理服务器（`scripts/proxy-server.mjs`，端口 19001），m3u8 请求通过代理完成广告过滤。API 请求也经过此代理绕过浏览器 CORS 限制。
+
+### 其他说明
 
 - 部分资源站可能因防盗链、TLS、线路失效或网络封锁而无法搜索/播放
 - HTTP 源已在 `app.json` 配置明文流量允许（`usesCleartextTraffic` / ATS）
 - 本地数据（历史、收藏、源设置）保存在 AsyncStorage，卸载 App 会丢失
+- `src/utils/m3u8Filter.js` 导出 `filterSegmentsText(text, baseUrl)`，可在任何平台独立使用（纯 JS，无平台依赖）
 
 ## 项目结构
 
 ```
 mobile/
-├── App.js                 # 入口：Provider + 导航
+├── App.js                 # 入口：Provider + 导航 + 启动缓存清理
 ├── src/
 │   ├── api/               # 搜索、分类、详情、解析
-│   ├── components/        # 卡片、弹窗
+│   ├── components/
+│   │   ├── HlsVideo.js    # Web HLS 播放器（hls.js / 原生 HLS）
+│   │   ├── ResultCard.js  # 搜索结果卡片
+│   │   ├── SettingsModal.js
+│   │   ├── HistoryModal.js
+│   │   └── FavoriteFolderModal.js
 │   ├── constants/         # 应用常量
 │   ├── context/           # 状态（源、搜索、播放、历史、收藏）
 │   ├── hooks/             # 组合逻辑（如打开播放页）
 │   ├── navigation/        # React Navigation 路由
 │   ├── screens/           # 页面组件
+│   ├── styles/            # 样式文件
+│   ├── utils/
+│   │   └── m3u8Filter.js  # m3u8 广告过滤（无平台依赖）
 │   └── storage.js         # AsyncStorage
 └── scripts/
+    ├── proxy-server.mjs   # Web 代理（CORS + m3u8 广告过滤）
+    ├── start-web.js       # 启动脚本（代理 + Expo）
+    ├── check.js           # Babel 编译检查
+    └── parser-check.js    # 播放地址解析检查
 ```
 
 ## 内置资源站
 
-见 `src/api/sites.js`，包含如意、森林、天涯、暴风等 CMS 源。可通过设置页追加自定义源。
+见 `src/api/sites.js`，包含如意、森林、天涯、暴风、电影天堂、非凡影视、豆瓣资源、爱乐资源、无尽资源、百度资源等 CMS 源。可通过设置页添加自定义源。

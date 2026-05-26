@@ -1,0 +1,8 @@
+refactor: m3u8 ad filtering and playback architecture 
+ 
+Changes: 
+- Web: m3u8 via proxy + hls.js integration 
+- Mobile: local ad filtering via expo-file-system 
+- ErrorBoundary, modal lazy render, cache cleanup 
+- Shared m3u8Parser.js, api/utils.js extracted 
+- Dead code removed, new deps: hls.js expo-file-system 

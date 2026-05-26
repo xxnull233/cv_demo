@@ -1,33 +1,35 @@
 ﻿/**
  * CV 本地代理服务器
- * 用于 web 调试时绕过 CORS 限制，将请求转发到采集站 API
- * 
+ * 用于 web 调试时绕过 CORS 限制 + m3u8 广告过滤
+ *
  * 启动方式: node scripts/proxy-server.mjs
  * 默认端口: 19001
- * 
+ *
  * 请求格式:
- *   GET /proxy?url=https://target.api/...   → 代理 JSON/文本请求
- *   GET /health                              → 健康检查
+ *   GET /proxy?url=...           → 代理 JSON/文本请求（API 用）
+ *   GET /m3u8?url=...            → 代理 m3u8 + 广告过滤
+ *   GET /health                  → 健康检查
  */
 
 import http from "node:http";
 import https from "node:https";
 import { URL } from "node:url";
+import { resolveUrl, getPathDir, detectAdSegments, parseMasterPlaylist } from "../src/utils/m3u8Parser.js";
 
 const PORT = parseInt(process.env.PROXY_PORT || "19001", 10);
 
-// CORS 头，允许 web 端跨域请求
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Accept",
 };
 
-// 默认转发请求头
 const DEFAULT_HEADERS = {
   "Accept": "application/json,text/plain,*/*",
   "User-Agent": "CV-Proxy/0.1.0",
 };
+
+// ─── HTTP fetch helper ────────────────────────────────────────────
 
 function fetchTarget(targetUrl, timeout = 15000) {
   return new Promise((resolve, reject) => {
@@ -60,11 +62,124 @@ function fetchTarget(targetUrl, timeout = 15000) {
     req.on("error", (err) => reject(err));
     req.on("timeout", () => {
       req.destroy();
-      reject(new Error(`Request timed out after ${timeout}ms`));
+      reject(new Error("Request timed out after " + timeout + "ms"));
     });
     req.end();
   });
 }
+
+// ─── m3u8 parsing ─────────────────────────────────────────────────
+
+function parseM3u8Segments(text) {
+  const lines = text.split("\n");
+  const segments = [];
+  let currentExtinf = null;
+  let currentKey = null;
+  let hasDiscontinuity = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    if (line.startsWith("#EXTINF:")) {
+      const duration = parseFloat(line.replace("#EXTINF:", "").replace(",", ""));
+      currentExtinf = duration;
+    } else if (line.startsWith("#EXT-X-KEY:")) {
+      currentKey = line;
+    } else if (line.startsWith("#EXT-X-DISCONTINUITY")) {
+      hasDiscontinuity = true;
+    } else if (!line.startsWith("#")) {
+      segments.push({
+        url: line,
+        duration: currentExtinf || 0,
+        key: currentKey,
+        index: segments.length,
+        afterDiscontinuity: hasDiscontinuity,
+      });
+      currentExtinf = null;
+    }
+  }
+
+  return { segments, hasDiscontinuity };
+}
+
+// ─── 重建 playlist（删除广告段后重新生成）────────────────────────
+
+function generateCleanPlaylist(segments, adIndices, baseUrl) {
+  const cleanSegments = segments.filter((_, i) => !adIndices.has(i));
+
+  if (cleanSegments.length === 0) {
+    return { clean: null, adCount: segments.length, totalCount: segments.length };
+  }
+
+  const lines = [];
+  lines.push("#EXTM3U");
+  lines.push("#EXT-X-VERSION:3");
+  lines.push("#EXT-X-TARGETDURATION:10");
+  lines.push("#EXT-X-PLAYLIST-TYPE:VOD");
+  lines.push("#EXT-X-MEDIA-SEQUENCE:0");
+
+  let currentKey = null;
+  for (const seg of cleanSegments) {
+    if (seg.key && seg.key !== currentKey) {
+      const resolvedKey = seg.key.replace(
+        /URI="([^"]+)"/g,
+        (_, uri) => 'URI="' + resolveUrl(baseUrl, uri) + '"'
+      );
+      lines.push(resolvedKey);
+      currentKey = seg.key;
+    }
+    lines.push("#EXTINF:" + seg.duration.toFixed(3) + ",");
+    lines.push(resolveUrl(baseUrl, seg.url));
+  }
+
+  lines.push("#EXT-X-ENDLIST");
+
+  return {
+    clean: lines.join("\n"),
+    adCount: segments.length - cleanSegments.length,
+    totalCount: segments.length,
+  };
+}
+
+// ─── 下载 + 过滤 m3u8 ────────────────────────────────────────────
+
+async function fetchAndFilterM3u8(m3u8Url) {
+  const result = await fetchTarget(m3u8Url);
+  const text = result.body.toString("utf-8");
+
+  if (text.includes("#EXT-X-STREAM-INF")) {
+    const streams = parseMasterPlaylist(text, m3u8Url);
+    streams.sort((a, b) => b.bandwidth - a.bandwidth);
+    if (streams.length === 0) {
+      return { error: "No streams in master playlist" };
+    }
+    return await fetchAndFilterM3u8(streams[0].url);
+  }
+
+  const { segments, hasDiscontinuity } = parseM3u8Segments(text);
+
+  if (segments.length === 0) {
+    return { clean: text, adCount: 0, totalCount: 0 };
+  }
+
+  const baseUrl = m3u8Url;
+  const adIndices = detectAdSegments(segments, baseUrl);
+
+  const adInfo = generateCleanPlaylist(segments, adIndices, baseUrl);
+
+  if (adInfo.clean === null) {
+    return { error: "All segments filtered as ads" };
+  }
+
+  return {
+    clean: adInfo.clean,
+    adCount: adInfo.adCount,
+    totalCount: segments.length,
+  };
+}
+
+// ─── Query parsing ────────────────────────────────────────────────
 
 function parseQuery(url) {
   const idx = url.indexOf("?");
@@ -81,8 +196,9 @@ function parseQuery(url) {
   return params;
 }
 
+// ─── HTTP server ──────────────────────────────────────────────────
+
 const server = http.createServer(async (req, res) => {
-  // 处理 OPTIONS 预检请求
   if (req.method === "OPTIONS") {
     res.writeHead(204, CORS_HEADERS);
     res.end();
@@ -91,18 +207,49 @@ const server = http.createServer(async (req, res) => {
 
   const urlPath = req.url || "/";
 
-  // 健康检查
+  // Health check
   if (urlPath === "/health") {
     res.writeHead(200, { "Content-Type": "application/json", ...CORS_HEADERS });
     res.end(JSON.stringify({ status: "ok", port: PORT }));
     return;
   }
 
-  // 代理请求
-  if (urlPath.startsWith("/proxy")) {
-    const query = parseQuery(urlPath);
-    const targetUrl = query.url;
+  const query = parseQuery(urlPath);
 
+  // ── m3u8 proxy + ad filter ──
+  if (urlPath.startsWith("/m3u8")) {
+    const targetUrl = query.url;
+    if (!targetUrl) {
+      res.writeHead(400, { "Content-Type": "application/json", ...CORS_HEADERS });
+      res.end(JSON.stringify({ error: "Missing ?url= parameter" }));
+      return;
+    }
+
+    try {
+      const result = await fetchAndFilterM3u8(targetUrl);
+
+      if (result.error) {
+        res.writeHead(502, { "Content-Type": "application/json", ...CORS_HEADERS });
+        res.end(JSON.stringify({ error: result.error }));
+        return;
+      }
+
+      res.writeHead(200, {
+        "Content-Type": "application/vnd.apple.mpegurl",
+        ...CORS_HEADERS,
+        "Cache-Control": "no-cache",
+      });
+      res.end(result.clean, "utf-8");
+    } catch (err) {
+      res.writeHead(502, { "Content-Type": "application/json", ...CORS_HEADERS });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
+  // ── Generic proxy (API requests) ──
+  if (urlPath.startsWith("/proxy")) {
+    const targetUrl = query.url;
     if (!targetUrl) {
       res.writeHead(400, { "Content-Type": "application/json", ...CORS_HEADERS });
       res.end(JSON.stringify({ error: "Missing ?url= parameter" }));
@@ -111,33 +258,29 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const result = await fetchTarget(targetUrl);
-
       const responseHeaders = {
         ...CORS_HEADERS,
         "Content-Type": result.isJson ? "application/json" : "text/plain; charset=utf-8",
         "Cache-Control": "no-cache",
       };
-
       res.writeHead(result.status, responseHeaders);
       res.end(result.body);
     } catch (err) {
-      console.error(`[proxy] Error fetching ${targetUrl}:`, err.message);
       res.writeHead(502, { "Content-Type": "application/json", ...CORS_HEADERS });
       res.end(JSON.stringify({ error: err.message }));
     }
     return;
   }
 
-  // 404
   res.writeHead(404, { "Content-Type": "text/plain", ...CORS_HEADERS });
   res.end("Not Found");
 });
 
 server.listen(PORT, () => {
-  console.log(`✅ CV 代理服务器已启动: http://localhost:${PORT}`);
-  console.log(`   ─ 代理请求: http://localhost:${PORT}/proxy?url=<encoded_target_url>`);
-  console.log(`   ─ 健康检查: http://localhost:${PORT}/health`);
-  console.log(`   按 Ctrl+C 停止`);
+  console.log("✅ CV 代理服务器已启动: http://localhost:" + PORT);
+  console.log("   ─ API 代理:     /proxy?url=...");
+  console.log("   ─ m3u8 过滤:   /m3u8?url=...");
+  console.log("   ─ 健康检查:    /health");
 });
 
 server.on("error", (err) => {

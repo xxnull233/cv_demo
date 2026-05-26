@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+﻿import AsyncStorage from "@react-native-async-storage/async-storage";
 import { DEFAULT_SELECTED_SOURCES } from "./api/sites";
 
 const SOURCE_KEY = "libretv.mobile.selectedSources";
@@ -91,6 +91,18 @@ export async function saveHistoryItem(item) {
 
 export async function clearHistory() {
   await AsyncStorage.removeItem(HISTORY_KEY);
+}
+
+export async function updateHistoryProgress(id, sourceKey, progress) {
+  const history = await loadHistory();
+  const next = history.map((entry) => {
+    if (entry.sourceKey === sourceKey && entry.id === id) {
+      return { ...entry, ...progress, watchedAt: Date.now() };
+    }
+    return entry;
+  });
+  await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  return next;
 }
 const FAVORITES_KEY = "libretv.mobile.favorites";
 const LAST_FAVORITE_FOLDER_KEY = "libretv.mobile.lastFavoriteFolder";
@@ -228,5 +240,6 @@ export async function deleteFavoriteFolder(folderId) {
   await saveFavorites(fav);
   return fav;
 }
+
 
 

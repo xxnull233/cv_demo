@@ -1,4 +1,4 @@
-import { StyleSheet } from "react-native";
+﻿import { StyleSheet } from "react-native";
 import { EPISODE_GRID_GAP } from "../constants/player";
 
 export const styles = StyleSheet.create({
@@ -60,6 +60,14 @@ export const styles = StyleSheet.create({
 
   },
 
+  videoWrapper: {
+
+    position: "relative",
+
+    width: "100%"
+
+  },
+
   video: {
 
     width: "100%",
@@ -67,6 +75,54 @@ export const styles = StyleSheet.create({
     aspectRatio: 16 / 9,
 
     backgroundColor: "#000"
+
+  },
+
+  playerOverlay: {
+
+    ...StyleSheet.absoluteFillObject,
+
+    justifyContent: "center",
+
+    alignItems: "center",
+
+    backgroundColor: "rgba(0,0,0,0.6)",
+
+    gap: 12
+
+  },
+
+  playerOverlayText: {
+
+    color: "#d4d4d4",
+
+    fontSize: 14,
+
+    fontWeight: "600"
+
+  },
+
+  retryButton: {
+
+    borderRadius: 8,
+
+    borderWidth: 1,
+
+    borderColor: "#38bdf8",
+
+    paddingHorizontal: 20,
+
+    paddingVertical: 10
+
+  },
+
+  retryButtonText: {
+
+    color: "#38bdf8",
+
+    fontWeight: "700",
+
+    fontSize: 14
 
   },
 
@@ -89,90 +145,6 @@ export const styles = StyleSheet.create({
     fontWeight: "800",
 
     letterSpacing: 0.3
-
-  },
-
-  rateRow: {
-
-    marginTop: 14,
-
-    borderRadius: 10,
-
-    borderWidth: 1,
-
-    borderColor: "#242424",
-
-    backgroundColor: "#0f0f0f",
-
-    padding: 12,
-
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    justifyContent: "space-between"
-
-  },
-
-  rateLabel: {
-
-    color: "#d4d4d4",
-
-    fontSize: 14,
-
-    fontWeight: "800"
-
-  },
-
-  rateButtons: {
-
-    flexDirection: "row",
-
-    gap: 8
-
-  },
-
-  rateButton: {
-
-    minWidth: 58,
-
-    borderRadius: 8,
-
-    borderWidth: 1,
-
-    borderColor: "#2a2a2a",
-
-    backgroundColor: "#171717",
-
-    paddingHorizontal: 12,
-
-    paddingVertical: 9
-
-  },
-
-  rateButtonActive: {
-
-    backgroundColor: "#f8fafc",
-
-    borderColor: "#f8fafc"
-
-  },
-
-  rateButtonText: {
-
-    color: "#d4d4d4",
-
-    textAlign: "center",
-
-    fontWeight: "800",
-
-    fontSize: 13
-
-  },
-
-  rateButtonTextActive: {
-
-    color: "#050505"
 
   },
 

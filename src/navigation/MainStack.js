@@ -1,8 +1,9 @@
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
+﻿import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { CategoryScreen } from "../screens/CategoryScreen";
 import { FavoritesScreen } from "../screens/FavoritesScreen";
 import { HomeScreen } from "../screens/HomeScreen";
+import { PlayerScreen } from "../screens/PlayerScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -12,6 +13,11 @@ export function MainStack() {
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Categories" component={CategoryScreen} />
       <Stack.Screen name="Favorites" component={FavoritesScreen} />
+      <Stack.Screen
+        name="Player"
+        component={PlayerScreen}
+        options={{ presentation: "fullScreenModal" }}
+      />
     </Stack.Navigator>
   );
 }

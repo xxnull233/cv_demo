@@ -1,5 +1,5 @@
-﻿import { Platform } from "react-native";
-import { API_HEADERS, PROXY_BASE_URL } from "./sites";
+﻿import { API_HEADERS } from "./sites";
+import { resolveUrl, withTimeout, normalizeApiBase } from "./utils";
 import {
   linesFromText,
   parseLinesFromPlayUrl,
@@ -10,33 +10,15 @@ import {
 const SEARCH_TIMEOUT = 9000;
 const DETAIL_TIMEOUT = 10000;
 
-function withTimeout(ms) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), ms);
-  return { controller, timeoutId };
-}
-
-function normalizeApiBase(url) {
-  return url.replace(/\/+$/, "");
-}
-
-// 在 Web 平台通过本地代理转发，绕过 CORS 限制
-function resolveUrl(targetUrl) {
-  if (Platform.OS === "web") {
-    return `${PROXY_BASE_URL}?url=${encodeURIComponent(targetUrl)}`;
-  }
-  return targetUrl;
-}
-
 function getSearchUrl(site, query, page = 1) {
   const base = normalizeApiBase(site.api);
   const encoded = encodeURIComponent(query);
-  if (page <= 1) return `${base}?ac=videolist&wd=${encoded}`;
-  return `${base}?ac=videolist&wd=${encoded}&pg=${page}`;
+  if (page <= 1) return base + "?ac=videolist&wd=" + encoded;
+  return base + "?ac=videolist&wd=" + encoded + "&pg=" + page;
 }
 
 function getDetailUrl(site, id) {
-  return `${normalizeApiBase(site.api)}?ac=videolist&ids=${encodeURIComponent(id)}`;
+  return normalizeApiBase(site.api) + "?ac=videolist&ids=" + encodeURIComponent(id);
 }
 
 async function fetchJson(url, timeout) {
@@ -47,7 +29,7 @@ async function fetchJson(url, timeout) {
       signal: controller.signal
     });
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      throw new Error("HTTP " + response.status);
     }
     return await response.json();
   } finally {
@@ -63,7 +45,7 @@ async function fetchText(url, timeout) {
       signal: controller.signal
     });
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      throw new Error("HTTP " + response.status);
     }
     return await response.text();
   } finally {
@@ -90,7 +72,7 @@ export async function searchSource(sourceKey, query, sourceMap) {
       raw: item
     }));
   } catch (error) {
-    console.warn(`Search failed for ${sourceKey}:`, error.message);
+    console.warn("Search failed for " + sourceKey + ":", error.message);
     return [];
   }
 }
@@ -100,13 +82,13 @@ export async function searchManySources(sourceKeys, query, sourceMap) {
     sourceKeys.map((key) => searchSource(key, query, sourceMap))
   );
   const merged = batches.flat();
-  return uniqueBy(merged, (item) => `${item.sourceKey}:${item.id}`);
+  return uniqueBy(merged, (item) => item.sourceKey + ":" + item.id);
 }
 
 async function loadHtmlDetail(site, id, sourceKey) {
   if (!site.detail) return null;
 
-  const detailUrl = `${normalizeApiBase(site.detail)}/index.php/vod/detail/id/${encodeURIComponent(id)}.html`;
+  const detailUrl = normalizeApiBase(site.detail) + "/index.php/vod/detail/id/" + encodeURIComponent(id) + ".html";
   const html = await fetchText(detailUrl, DETAIL_TIMEOUT);
   const title = html.match(/<h1[^>]*>([^<]+)<\/h1>/i)?.[1]?.trim() || "";
   const desc = html.match(/<div[^>]*class=["']sketch["'][^>]*>([\s\S]*?)<\/div>/i)?.[1] || "";

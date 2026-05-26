@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react";
+﻿import { createContext, useContext, useRef, useState } from "react";
 
 import { loadDetail } from "../api/client";
 import { useHistory } from "./HistoryContext";
@@ -13,8 +13,10 @@ export function PlayerProvider({ children }) {
   const [currentDetail, setCurrentDetail] = useState(null);
   const [currentEpisodeIndex, setCurrentEpisodeIndex] = useState(0);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState(1);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  // Saved playback position for resuming (set when opening from history)
+  const savedPlaybackTime = useRef(0);
 
   async function openResult(result) {
     setDetailLoading(true);
@@ -24,16 +26,27 @@ export function PlayerProvider({ children }) {
         alert("该资源没有可播放剧集");
         return false;
       }
-      setCurrentEpisodeIndex(0);
-      setCurrentLineIndex(0);
+
+      // Restore position from history item (if coming from history)
+      const restoreLineIndex = result.lineIndex ?? 0;
+      const restoreEpisodeIndex = result.episodeIndex ?? 0;
+      const restoreTime = result.currentTime ?? 0;
+
+      setCurrentLineIndex(restoreLineIndex);
+      setCurrentEpisodeIndex(Math.min(restoreEpisodeIndex, Math.max(0, detail.episodes.length - 1)));
+      savedPlaybackTime.current = restoreTime > 0 ? restoreTime : 0;
       setCurrentDetail({ ...detail, id: result.id });
+
       await addHistoryItem({
         id: result.id,
         title: detail.title || result.title,
         poster: detail.poster || result.poster,
         sourceKey: result.sourceKey,
         sourceName: result.sourceName,
-        episodeCount: detail.episodes.length
+        episodeCount: detail.episodes.length,
+        lineIndex: restoreLineIndex,
+        episodeIndex: restoreEpisodeIndex,
+        episodeUrl: detail.episodes[restoreEpisodeIndex]?.url || ""
       });
       return true;
     } catch (error) {
@@ -46,6 +59,7 @@ export function PlayerProvider({ children }) {
 
   function closePlayer() {
     setCurrentDetail(null);
+    savedPlaybackTime.current = 0;
   }
 
   function selectLine(index) {
@@ -57,13 +71,12 @@ export function PlayerProvider({ children }) {
     currentDetail,
     currentEpisodeIndex,
     currentLineIndex,
-    playbackRate,
+    savedPlaybackTime,
     detailLoading,
     openResult,
     closePlayer,
     setCurrentEpisodeIndex,
-    selectLine,
-    setPlaybackRate
+    selectLine
   };
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

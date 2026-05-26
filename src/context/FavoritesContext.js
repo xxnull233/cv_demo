@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+﻿import { createContext, useContext, useEffect, useState } from "react";
 
 import { FavoriteFolderModal } from "../components/FavoriteFolderModal";
 import {
@@ -98,7 +98,7 @@ export function FavoritesProvider({ children }) {
   return (
     <FavoritesContext.Provider value={value}>
       {children}
-      <FavoriteFolderModal
+      {pickerVisible && <FavoriteFolderModal
         visible={pickerVisible}
         video={pickerVideo}
         folders={favorites.folders}
@@ -111,7 +111,7 @@ export function FavoritesProvider({ children }) {
         onClose={closePicker}
         onSelectFolder={addToFolder}
         onCreateFolder={createFolder}
-      />
+      />}
     </FavoritesContext.Provider>
   );
 }
@@ -123,3 +123,5 @@ export function useFavorites() {
   }
   return context;
 }
+
+

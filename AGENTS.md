@@ -1,7 +1,12 @@
 # AGENTS.md
 
 ## 项目说明
-这是一个 RN的EXPO 项目，它是一个直连采集站的影视资源搜索与播放 App，去掉了后端代理层，请求直接从 App 发往资源站 API。
+CV Mobile：基于 Expo 的 React Native 影视搜索与播放 App，直连采集站 API，无后端代理层。
+
+## 架构
+- 状态：`src/context/`（Source / Search / Player / History / Favorites）
+- 路由：`src/navigation/`（React Navigation Native Stack）
+- 入口：`App.js` 仅组合 Provider 与 RootNavigator
 
 ## 开发规范
 - 使用 EXPO

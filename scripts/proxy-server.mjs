@@ -1,5 +1,5 @@
 ﻿/**
- * LibreTV 本地代理服务器
+ * CV 本地代理服务器
  * 用于 web 调试时绕过 CORS 限制，将请求转发到采集站 API
  * 
  * 启动方式: node scripts/proxy-server.mjs
@@ -26,7 +26,7 @@ const CORS_HEADERS = {
 // 默认转发请求头
 const DEFAULT_HEADERS = {
   "Accept": "application/json,text/plain,*/*",
-  "User-Agent": "LibreTV-Proxy/0.1.0",
+  "User-Agent": "CV-Proxy/0.1.0",
 };
 
 function fetchTarget(targetUrl, timeout = 15000) {
@@ -134,7 +134,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`✅ LibreTV 代理服务器已启动: http://localhost:${PORT}`);
+  console.log(`✅ CV 代理服务器已启动: http://localhost:${PORT}`);
   console.log(`   ─ 代理请求: http://localhost:${PORT}/proxy?url=<encoded_target_url>`);
   console.log(`   ─ 健康检查: http://localhost:${PORT}/health`);
   console.log(`   按 Ctrl+C 停止`);

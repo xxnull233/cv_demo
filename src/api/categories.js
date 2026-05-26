@@ -15,7 +15,7 @@ function normalizeApiBase(url) {
   return url.replace(/\/+$/, "");
 }
 
-// ? Web ????????????? CORS ??
+// Web browser CORS workaround - fetch via proxy
 function resolveUrl(targetUrl) {
   if (Platform.OS === "web") {
     return `${PROXY_BASE_URL}?url=${encodeURIComponent(targetUrl)}`;
@@ -38,7 +38,7 @@ export async function fetchCategories(site) {
       headers: API_HEADERS,
       signal: controller.signal
     });
-    if (!response.ok) throw new Error(HTTP );
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const text = await response.text();
     const data = JSON.parse(text);
@@ -72,7 +72,7 @@ export async function fetchCategoryVideos(site, classId, siteKey, page = 1) {
       headers: API_HEADERS,
       signal: controller.signal
     });
-    if (!response.ok) throw new Error(HTTP );
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const text = await response.text();
     const data = JSON.parse(text);

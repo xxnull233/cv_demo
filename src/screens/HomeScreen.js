@@ -1,4 +1,6 @@
+import { useNavigation } from "@react-navigation/native";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
+import { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -9,50 +11,62 @@ import {
   View
 } from "react-native";
 
+import { HistoryModal } from "../components/HistoryModal";
+import { ResultCard } from "../components/ResultCard";
+import { SettingsModal } from "../components/SettingsModal";
+import { APP_NAME } from "../constants/app";
+import { useFavorites } from "../context/FavoritesContext";
+import { useHistory } from "../context/HistoryContext";
+import { useSearch } from "../context/SearchContext";
+import { useSources } from "../context/SourceContext";
+import { useOpenResult } from "../hooks/useOpenResult";
 import { styles as homeStyles } from "../styles/home";
 import { styles as sharedStyles } from "../styles/shared";
 
 const styles = { ...sharedStyles, ...homeStyles };
 
-import { HistoryModal } from "../components/HistoryModal";
-import { ResultCard } from "../components/ResultCard";
-import { SettingsModal } from "../components/SettingsModal";
+export function HomeScreen() {
+  const navigation = useNavigation();
+  const { query, setQuery, results, loading, resultCountLabel, handleSearch } = useSearch();
+  const {
+    selectedSources,
+    sourceEntries,
+    toggleSource,
+    selectAllSources,
+    resetDefaultSources,
+    saveCustomSource,
+    deleteCustomSource
+  } = useSources();
+  const { history, clearAllHistory } = useHistory();
+  const { favorites, checkIsFavorited, handleFavoritePress } = useFavorites();
+  const { openResult, detailLoading } = useOpenResult();
 
-export function HomeScreen({
-  query,
-  setQuery,
-  results,
-  selectedSources,
-  sourceEntries,
-  history,
-  loading,
-  detailLoading,
-  resultCountLabel,
-  settingsVisible,
-  historyVisible,
-  onSearch,
-  onOpenResult,
-  onToggleSource,
-  onSelectAllSources,
-  onResetDefaultSources,
-  onSaveCustomSource,
-  onDeleteCustomSource,
-  onClearHistory,
-  onOpenHistory,
-  setSettingsVisible,
-  setHistoryVisible,
-  onOpenCategories
-}) {
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [historyVisible, setHistoryVisible] = useState(false);
+
+  async function handleOpenHistory(historyItem) {
+    setHistoryVisible(false);
+    await openResult(historyItem);
+  }
+
+  async function handleClearHistory() {
+    await clearAllHistory();
+    setHistoryVisible(false);
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ExpoStatusBar style="light" backgroundColor="#050505" translucent={false} />
       <View style={styles.header}>
         <View>
-          <Text style={styles.brand}>CV</Text>
+          <Text style={styles.brand}>{APP_NAME}</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable style={styles.iconButton} onPress={onOpenCategories}>
+          <Pressable style={styles.iconButton} onPress={() => navigation.navigate("Categories")}>
             <Text style={styles.iconButtonText}>分类</Text>
+          </Pressable>
+          <Pressable style={styles.iconButton} onPress={() => navigation.navigate("Favorites")}>
+            <Text style={styles.iconButtonText}>收藏</Text>
           </Pressable>
           <Pressable style={styles.iconButton} onPress={() => setHistoryVisible(true)}>
             <Text style={styles.iconButtonText}>历史</Text>
@@ -71,9 +85,9 @@ export function HomeScreen({
           placeholderTextColor="#737373"
           style={styles.searchInput}
           returnKeyType="search"
-          onSubmitEditing={onSearch}
+          onSubmitEditing={handleSearch}
         />
-        <Pressable style={styles.searchButton} onPress={onSearch} disabled={loading}>
+        <Pressable style={styles.searchButton} onPress={handleSearch} disabled={loading}>
           <Text style={styles.searchButtonText}>{loading ? "..." : "搜索"}</Text>
         </Pressable>
       </View>
@@ -92,17 +106,21 @@ export function HomeScreen({
         <FlatList
           data={results}
           renderItem={({ item }) => (
-            <ResultCard item={item} onOpen={onOpenResult} />
+            <ResultCard
+              item={item}
+              onOpen={openResult}
+              onFavorite={handleFavoritePress}
+              isFavorited={checkIsFavorited(item)}
+            />
           )}
           keyExtractor={(item) => `${item.sourceKey}-${item.id}`}
+          extraData={favorites}
           contentContainerStyle={styles.listContent}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <View style={styles.centerState}>
               <Text style={styles.centerTitle}>输入关键字开始搜索</Text>
-              <Text style={styles.centerText}>
-                
-              </Text>
+              <Text style={styles.centerText} />
             </View>
           }
         />
@@ -120,18 +138,18 @@ export function HomeScreen({
         selectedSources={selectedSources}
         sourceEntries={sourceEntries}
         onClose={() => setSettingsVisible(false)}
-        onToggle={onToggleSource}
-        onSelectAll={onSelectAllSources}
-        onResetDefault={onResetDefaultSources}
-        onSaveCustomSource={onSaveCustomSource}
-        onDeleteCustomSource={onDeleteCustomSource}
+        onToggle={toggleSource}
+        onSelectAll={selectAllSources}
+        onResetDefault={resetDefaultSources}
+        onSaveCustomSource={saveCustomSource}
+        onDeleteCustomSource={deleteCustomSource}
       />
       <HistoryModal
         visible={historyVisible}
         history={history}
         onClose={() => setHistoryVisible(false)}
-        onClear={onClearHistory}
-        onOpen={onOpenHistory}
+        onClear={handleClearHistory}
+        onOpen={handleOpenHistory}
       />
     </SafeAreaView>
   );

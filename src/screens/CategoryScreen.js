@@ -8,15 +8,23 @@ import {
   Text,
   View
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 
 import { styles } from "../styles/categories";
 import { ResultCard } from "../components/ResultCard";
 import { fetchCategories, fetchCategoryVideos } from "../api/categories";
+import { useFavorites } from "../context/FavoritesContext";
+import { useSources } from "../context/SourceContext";
+import { useOpenResult } from "../hooks/useOpenResult";
 
 const CATEGORY_BAR_HEIGHT = 36;
 
-export function CategoryScreen({ sourceEntries, onOpenResult, onBack, detailLoading }) {
+export function CategoryScreen() {
+  const navigation = useNavigation();
+  const { sourceEntries } = useSources();
+  const { favorites, checkIsFavorited, handleFavoritePress } = useFavorites();
+  const { openResult, detailLoading } = useOpenResult();
   const [siteKey, setSiteKey] = useState("");
   const [categories, setCategories] = useState([]);
   const [activeCategoryId, setActiveCategoryId] = useState("");
@@ -139,7 +147,7 @@ export function CategoryScreen({ sourceEntries, onOpenResult, onBack, detailLoad
 
       {/* 顶部导航 */}
       <View style={styles.header}>
-        <Pressable style={styles.ghostButton} onPress={onBack}>
+        <Pressable style={styles.ghostButton} onPress={() => navigation.goBack()}>
           <Text style={styles.ghostButtonText}>返回</Text>
         </Pressable>
         <View style={{ flex: 1 }} />
@@ -182,9 +190,15 @@ export function CategoryScreen({ sourceEntries, onOpenResult, onBack, detailLoad
         ref={flatListRef}
         data={videos}
         renderItem={({ item }) => (
-          <ResultCard item={item} onOpen={onOpenResult} />
+          <ResultCard
+            item={item}
+            onOpen={openResult}
+            onFavorite={handleFavoritePress}
+            isFavorited={checkIsFavorited(item)}
+          />
         )}
         keyExtractor={(item) => `${item.sourceKey}-${item.id}`}
+        extraData={favorites}
         contentContainerStyle={[styles.listContent, { paddingTop: 4 }]}
         refreshing={refreshing}
         onRefresh={handleRefresh}

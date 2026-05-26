@@ -89,7 +89,7 @@ android {
 
     namespace 'com.anonymous.libretvmobile'
     defaultConfig {
-        applicationId 'com.anonymous.libretvmobile'
+        applicationId 'com.anonymous.cv'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

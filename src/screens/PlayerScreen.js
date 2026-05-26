@@ -2,6 +2,7 @@ import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { Video, ResizeMode } from "expo-av";
 import { Pressable, SafeAreaView, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { useMemo } from "react";
+import { useNavigation } from "@react-navigation/native";
 
 import {
   EPISODE_GRID_GAP,
@@ -9,22 +10,31 @@ import {
   PLAYBACK_RATES,
   PLAYER_HORIZONTAL_PADDING
 } from "../constants/player";
+import { usePlayer } from "../context/PlayerContext";
 import { styles as playerStyles } from "../styles/player";
 import { styles as sharedStyles } from "../styles/shared";
+
 const styles = { ...sharedStyles, ...playerStyles };
 
-export function PlayerScreen({
-  currentDetail,
-  currentEpisodeIndex,
-  playbackRate,
-  onBack,
-  onSelectEpisode,
-  onSelectLine,
-  onSetPlaybackRate,
-  onFullscreenUpdate,
-}) {
+export function PlayerScreen() {
+  const navigation = useNavigation();
+  const {
+    currentDetail,
+    currentEpisodeIndex,
+    currentLineIndex,
+    playbackRate,
+    closePlayer,
+    setCurrentEpisodeIndex,
+    selectLine,
+    setPlaybackRate
+  } = usePlayer();
+
   const { width: windowWidth } = useWindowDimensions();
-  const currentLineIndex = currentDetail.currentLineIndex || 0;
+
+  if (!currentDetail) {
+    return null;
+  }
+
   const currentLine = currentDetail.lines?.[currentLineIndex];
   const episodes = currentLine?.episodes || currentDetail.episodes || [];
   const currentEpisode = episodes[currentEpisodeIndex];
@@ -44,11 +54,16 @@ export function PlayerScreen({
     );
   }, [windowWidth]);
 
+  function handleBack() {
+    closePlayer();
+    navigation.goBack();
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ExpoStatusBar style="light" backgroundColor="#050505" translucent={false} />
       <View style={styles.playerHeader}>
-        <Pressable style={styles.ghostButton} onPress={onBack}>
+        <Pressable style={styles.ghostButton} onPress={handleBack}>
           <Text style={styles.ghostButtonText}>返回</Text>
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
@@ -64,7 +79,6 @@ export function PlayerScreen({
         shouldPlay
         rate={playbackRate}
         resizeMode={ResizeMode.CONTAIN}
-        onFullscreenUpdate={onFullscreenUpdate}
       />
 
       <ScrollView style={styles.playerContent}>
@@ -84,7 +98,7 @@ export function PlayerScreen({
                   styles.lineButton,
                   index === currentLineIndex && styles.lineButtonActive
                 ]}
-                onPress={() => onSelectLine(index)}
+                onPress={() => selectLine(index)}
               >
                 <Text
                   style={[
@@ -110,7 +124,7 @@ export function PlayerScreen({
                   styles.rateButton,
                   playbackRate === rate && styles.rateButtonActive
                 ]}
-                onPress={() => onSetPlaybackRate(rate)}
+                onPress={() => setPlaybackRate(rate)}
               >
                 <Text
                   style={[
@@ -134,7 +148,7 @@ export function PlayerScreen({
                 { width: episodeButtonWidth },
                 index === currentEpisodeIndex && styles.episodeButtonActive
               ]}
-              onPress={() => onSelectEpisode(index)}
+              onPress={() => setCurrentEpisodeIndex(index)}
             >
               <Text
                 style={[

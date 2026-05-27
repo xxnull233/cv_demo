@@ -11,6 +11,10 @@ on:
         options:
           - preview
           - production
+      release_tag:
+        description: '发布版本号（留空仅上传 Artifact，填写如 v1.0.0 则自动创建 Release）'
+        required: false
+        default: ''
 
 jobs:
   build:
@@ -56,8 +60,24 @@ jobs:
           EXPO_KEYSTORE_PASSWORD: ${{ secrets.EXPO_KEYSTORE_PASSWORD }}
           EXPO_KEY_PASSWORD: ${{ secrets.EXPO_KEY_PASSWORD }}
 
-      - name: Upload APK artifact
+      - name: Upload APK (Actions Artifact)
         uses: actions/upload-artifact@v4
         with:
           name: app-release.apk
           path: build-*.apk
+
+      - name: Create GitHub Release
+        if: ${{ github.event.inputs.release_tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_tag }}
+          body: |
+            ## CV Mobile ${{ github.event.inputs.release_tag }}
+
+            Profile: `${{ github.event.inputs.profile }}`
+            Commit: ${{ github.sha }}
+          files: build-*.apk
+          draft: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

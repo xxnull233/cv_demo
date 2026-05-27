@@ -50,7 +50,9 @@ jobs:
           echo "${{ secrets.ANDROID_KEYS_BASE64 }}" | base64 -d > $HOME/keys/keystore.jks
 
       - name: Build signed release APKs (split by ABI)
-        run: ./gradlew assembleRelease
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease
         working-directory: android
         env:
           ANDROID_KEYSTORE_PATH: $HOME/keys/keystore.jks

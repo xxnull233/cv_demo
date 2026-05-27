@@ -94,3 +94,84 @@ export function parseMasterPlaylist(text, masterUrl) {
 
   return streams;
 }
+/**
+ * 解析 Media Playlist，提取所有 segment
+ * 与 proxy-server.mjs 逻辑一致
+ * @param {string} text - m3u8 playlist 原始文本
+ * @returns {{ segments: Array, hasDiscontinuity: boolean }}
+ */
+export function parseM3u8Segments(text) {
+  const lines = text.split('\n');
+  const segments = [];
+  let currentExtinf = null;
+  let currentKey = null;
+  let hasDiscontinuity = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    if (line.startsWith('#EXTINF:')) {
+      const duration = parseFloat(line.replace('#EXTINF:', '').replace(',', ''));
+      currentExtinf = duration;
+    } else if (line.startsWith('#EXT-X-KEY:')) {
+      currentKey = line;
+    } else if (line.startsWith('#EXT-X-DISCONTINUITY')) {
+      hasDiscontinuity = true;
+    } else if (!line.startsWith('#')) {
+      segments.push({
+        url: line,
+        duration: currentExtinf || 0,
+        key: currentKey,
+        afterDiscontinuity: hasDiscontinuity,
+      });
+      currentExtinf = null;
+    }
+  }
+
+  return { segments, hasDiscontinuity };
+}
+
+/**
+ * 重建 playlist — 删除广告段后全新生成
+ * @param {Array} segments - 完整 segment 数组
+ * @param {Set<number>} adIndices - 广告段索引集合
+ * @param {string} baseUrl - 原始 m3u8 URL（用于展开相对路径）
+ * @returns {{ clean: string|null, adCount: number, totalCount: number }}
+ */
+export function generateCleanPlaylist(segments, adIndices, baseUrl) {
+  const cleanSegments = segments.filter((_, i) => !adIndices.has(i));
+
+  if (cleanSegments.length === 0) {
+    return { clean: null, adCount: segments.length, totalCount: segments.length };
+  }
+
+  const lines = [];
+  lines.push('#EXTM3U');
+  lines.push('#EXT-X-VERSION:3');
+  lines.push('#EXT-X-TARGETDURATION:10');
+  lines.push('#EXT-X-PLAYLIST-TYPE:VOD');
+  lines.push('#EXT-X-MEDIA-SEQUENCE:0');
+
+  let currentKey = null;
+  for (const seg of cleanSegments) {
+    if (seg.key && seg.key !== currentKey) {
+      const resolvedKey = seg.key.replace(
+        /URI="([^"]+)"/g,
+        (_, uri) => 'URI="' + resolveUrl(baseUrl, uri) + '"'
+      );
+      lines.push(resolvedKey);
+      currentKey = seg.key;
+    }
+    lines.push('#EXTINF:' + seg.duration.toFixed(3) + ',');
+    lines.push(resolveUrl(baseUrl, seg.url));
+  }
+
+  lines.push('#EXT-X-ENDLIST');
+
+  return {
+    clean: lines.join('\n'),
+    adCount: segments.length - cleanSegments.length,
+    totalCount: segments.length,
+  };
+}

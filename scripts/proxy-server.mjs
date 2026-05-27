@@ -14,7 +14,7 @@
 import http from "node:http";
 import https from "node:https";
 import { URL } from "node:url";
-import { resolveUrl, getPathDir, detectAdSegments, parseMasterPlaylist } from "../src/utils/m3u8Parser.js";
+import { resolveUrl, getPathDir, detectAdSegments, parseMasterPlaylist, parseM3u8Segments, generateCleanPlaylist } from "../src/utils/m3u8Parser.js";
 
 const PORT = parseInt(process.env.PROXY_PORT || "19001", 10);
 
@@ -68,79 +68,7 @@ function fetchTarget(targetUrl, timeout = 15000) {
   });
 }
 
-// ─── m3u8 parsing ─────────────────────────────────────────────────
-
-function parseM3u8Segments(text) {
-  const lines = text.split("\n");
-  const segments = [];
-  let currentExtinf = null;
-  let currentKey = null;
-  let hasDiscontinuity = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    if (line.startsWith("#EXTINF:")) {
-      const duration = parseFloat(line.replace("#EXTINF:", "").replace(",", ""));
-      currentExtinf = duration;
-    } else if (line.startsWith("#EXT-X-KEY:")) {
-      currentKey = line;
-    } else if (line.startsWith("#EXT-X-DISCONTINUITY")) {
-      hasDiscontinuity = true;
-    } else if (!line.startsWith("#")) {
-      segments.push({
-        url: line,
-        duration: currentExtinf || 0,
-        key: currentKey,
-        index: segments.length,
-        afterDiscontinuity: hasDiscontinuity,
-      });
-      currentExtinf = null;
-    }
-  }
-
-  return { segments, hasDiscontinuity };
-}
-
-// ─── 重建 playlist（删除广告段后重新生成）────────────────────────
-
-function generateCleanPlaylist(segments, adIndices, baseUrl) {
-  const cleanSegments = segments.filter((_, i) => !adIndices.has(i));
-
-  if (cleanSegments.length === 0) {
-    return { clean: null, adCount: segments.length, totalCount: segments.length };
-  }
-
-  const lines = [];
-  lines.push("#EXTM3U");
-  lines.push("#EXT-X-VERSION:3");
-  lines.push("#EXT-X-TARGETDURATION:10");
-  lines.push("#EXT-X-PLAYLIST-TYPE:VOD");
-  lines.push("#EXT-X-MEDIA-SEQUENCE:0");
-
-  let currentKey = null;
-  for (const seg of cleanSegments) {
-    if (seg.key && seg.key !== currentKey) {
-      const resolvedKey = seg.key.replace(
-        /URI="([^"]+)"/g,
-        (_, uri) => 'URI="' + resolveUrl(baseUrl, uri) + '"'
-      );
-      lines.push(resolvedKey);
-      currentKey = seg.key;
-    }
-    lines.push("#EXTINF:" + seg.duration.toFixed(3) + ",");
-    lines.push(resolveUrl(baseUrl, seg.url));
-  }
-
-  lines.push("#EXT-X-ENDLIST");
-
-  return {
-    clean: lines.join("\n"),
-    adCount: segments.length - cleanSegments.length,
-    totalCount: segments.length,
-  };
-}
+// ─── m3u8 parsing & playlist 重建（由 m3u8Parser.js 提供）
 
 // ─── 下载 + 过滤 m3u8 ────────────────────────────────────────────
 

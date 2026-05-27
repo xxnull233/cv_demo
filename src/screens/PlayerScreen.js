@@ -40,6 +40,14 @@ function getPlayerUrl(url) {
   return url;
 }
 
+function showToast(msg) {
+  if (Platform.OS === "android") {
+    ToastAndroid.show(msg, ToastAndroid.SHORT);
+  } else {
+    console.warn(msg);
+  }
+}
+
 export function PlayerScreen() {
   const navigation = useNavigation();
   const {
@@ -89,6 +97,12 @@ export function PlayerScreen() {
       try {
         const { text: cleanText, error } = await filterM3u8ByUrl(url);
 
+        if (!cleanText) {
+          showToast("过滤后 m3u8 为空，回退原始 URL");
+          if (!cancelled) setMobileFilteredUri(url);
+          return;
+        }
+
         const uid = Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
         const file = new File(Paths.cache, `hls_filtered_${uid}.m3u8`);
         file.write(cleanText);
@@ -126,7 +140,7 @@ export function PlayerScreen() {
           try { file.delete(); } catch {}
         }
       } catch (e) {
-        console.warn("m3u8 本地过滤失败，回退原始 URL:", e.message);
+        showToast("m3u8 过滤失败: " + e.message);
         if (!cancelled) setMobileFilteredUri(url);
       }
     })();

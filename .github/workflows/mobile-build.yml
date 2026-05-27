@@ -14,7 +14,7 @@ on:
 
 jobs:
   build:
-    name: Build Android APK via EAS
+    name: Build Android APK (Local)
     runs-on: ubuntu-latest
 
     steps:
@@ -28,19 +28,35 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+          expo-cache: true
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run expo-doctor checks
-        run: npx -y expo-doctor
+      - name: Setup Android keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYS_BASE64 }}" | base64 -d > $HOME/keys/keystore.jks
 
-      - name: EAS Android build
-        run: eas build -p android --profile ${{ github.event.inputs.profile || 'preview' }} --non-interactive
+      - name: EAS local Android build
+        run: eas build --platform android --profile ${{ github.event.inputs.profile || 'preview' }} --local --clear-cache --non-interactive
+        env:
+          EXPO_ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYS_BASE64 }}
+          EXPO_KEYSTORE_PASSWORD: ${{ secrets.EXPO_KEYSTORE_PASSWORD }}
+          EXPO_KEY_PASSWORD: ${{ secrets.EXPO_KEY_PASSWORD }}
 
-
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release.apk
+          path: build-*.apk

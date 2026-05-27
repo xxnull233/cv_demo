@@ -1,12 +1,12 @@
 ﻿import { StatusBar as ExpoStatusBar } from "expo-status-bar";
-import { useVideoPlayer, VideoView } from "expo-video";
-import { useEvent } from "expo";
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
   Text,
+  ToastAndroid,
   useWindowDimensions,
   View
 } from "react-native";
@@ -23,9 +23,9 @@ import { usePlayer } from "../context/PlayerContext";
 import { styles as playerStyles } from "../styles/player";
 import { styles as sharedStyles } from "../styles/shared";
 import { HlsVideo } from "../components/HlsVideo";
-import { File, Paths, StorageAccessFramework } from "expo-file-system";
+import { PlayerView } from "../components/PlayerView";
+import { File, Paths } from "expo-file-system";
 import { filterM3u8ByUrl } from "../utils/m3u8Filter";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const styles = { ...sharedStyles, ...playerStyles };
 const PROGRESS_SAVE_INTERVAL = 5000;
@@ -62,12 +62,17 @@ export function PlayerScreen() {
   const { updateProgress } = useHistory();
 
   const { width: windowWidth } = useWindowDimensions();
-  const hasRestored = useRef(false);
   const [hlsError, setHlsError] = useState(false);
   const [hlsRetryKey, setHlsRetryKey] = useState(0);
   const hlsTimeRef = useRef(0);
-  const [mobileFilteredUri, setMobileFilteredUri] = useState(null);
+
+  // 移动端：等待 m3u8 过滤完成后再初始化播放器
+  const [filtering, setFiltering] = useState(true);
+  const [filteredUri, setFilteredUri] = useState(null);
+  const [mobileRetryKey, setMobileRetryKey] = useState(0);
+  const [mobileError, setMobileError] = useState(false);
   const mobileFileRef = useRef(null);
+  const mobileTimeRef = useRef(0); // PlayerView 定期同步 currentTime 到此 ref
 
   // Compute episode/line info (safe when currentDetail is null)
   const currentLine = currentDetail?.lines?.[currentLineIndex];
@@ -77,10 +82,9 @@ export function PlayerScreen() {
   const isHlsOnWeb = Platform.OS === "web" && currentEpisode?.url?.includes(".m3u8");
   const isMobileM3u8 = Platform.OS !== "web" && currentEpisode?.url?.includes(".m3u8");
 
-  // 移动端 m3u8：下载 → 过滤广告 → 写入缓存文件 → file:// URI
+  // 移动端：下载 m3u8 → 过滤广告 → 写入缓存 → 设置 filteredUri
+  // 过滤完成前保持 loading，完成后才渲染 PlayerView
   useEffect(() => {
-    let cancelled = false;
-
     // 清理上一集的缓存文件
     if (mobileFileRef.current) {
       try { mobileFileRef.current.delete(); } catch {}
@@ -89,17 +93,28 @@ export function PlayerScreen() {
 
     const url = currentEpisode?.url;
     if (!url || !url.includes(".m3u8") || Platform.OS === "web") {
-      setMobileFilteredUri(url || null);
+      // 非 m3u8 或 Web 端：无需过滤，直接可用
+      setFilteredUri(url || null);
+      setFiltering(false);
       return;
     }
 
+    // 移动端 m3u8：开始过滤
+    let cancelled = false;
+    setFiltering(true);
+    setFilteredUri(null);
+    setMobileError(false);
+
     (async () => {
       try {
-        const { text: cleanText, error } = await filterM3u8ByUrl(url);
+        const { text: cleanText } = await filterM3u8ByUrl(url);
+
+        if (cancelled) return;
 
         if (!cleanText) {
           showToast("过滤后 m3u8 为空，回退原始 URL");
-          if (!cancelled) setMobileFilteredUri(url);
+          setFilteredUri(url);
+          setFiltering(false);
           return;
         }
 
@@ -107,89 +122,34 @@ export function PlayerScreen() {
         const file = new File(Paths.cache, `hls_filtered_${uid}.m3u8`);
         file.write(cleanText);
 
-        // 另存一份到 Downloads 供用户查看
-        try {
-          const vidTitle = (currentDetail?.title || "unknown").replace(/[<>:"/\\|?*]/g, "_").substring(0, 30);
-          const debugName = "hls_" + vidTitle + "_" + uid + ".m3u8.txt";
-          if (Platform.OS === "android") {
-            let downloadsUri = await AsyncStorage.getItem("debug_downloads_uri");
-            if (!downloadsUri) {
-              const perm = await StorageAccessFramework.requestDirectoryPermissionsAsync();
-              if (perm.granted) {
-                downloadsUri = perm.directoryUri;
-                await AsyncStorage.setItem("debug_downloads_uri", downloadsUri);
-              }
-            }
-            if (downloadsUri) {
-              const fileUri = await StorageAccessFramework.createFileAsync(
-                downloadsUri, debugName, "text/plain"
-              );
-              await StorageAccessFramework.writeAsStringAsync(fileUri, cleanText);
-            }
-          } else {
-            const debugFile = new File(Paths.documents, debugName);
-            debugFile.write(cleanText);
-          }
-        } catch (e) {
-          // 调试文件保存为可选功能，静默忽略
-        }
-        if (!cancelled) {
-          mobileFileRef.current = file;
-          setMobileFilteredUri(file.uri);
-        } else {
+        if (cancelled) {
           try { file.delete(); } catch {}
+          return;
         }
+
+        mobileFileRef.current = file;
+        setFilteredUri(file.uri);
+        setFiltering(false);
       } catch (e) {
+        if (cancelled) return;
         showToast("m3u8 过滤失败: " + e.message);
-        if (!cancelled) setMobileFilteredUri(url);
+        // 过滤失败则回退原始 URL
+        setFilteredUri(url);
+        setFiltering(false);
       }
     })();
 
     return () => {
       cancelled = true;
-      if (mobileFileRef.current) {
-        try { mobileFileRef.current.delete(); } catch {}
-        mobileFileRef.current = null;
-      }
     };
-  }, [currentEpisode?.url]);
+  }, [currentEpisode?.url, mobileRetryKey]);
 
-  // 移动端 m3u8 → 等待本地过滤完成（不降级原始 URL）；Web HLS → null（HlsVideo 接管）；其余 → 直连
-  const videoUrl = isMobileM3u8
-    ? mobileFilteredUri
-    : (isHlsOnWeb ? null : getPlayerUrl(currentEpisode?.url));
-
-  const player = useVideoPlayer(videoUrl, (player) => {
-    player.play();
-  });
-
-  // Track player status for error handling
-  const statusEvent = useEvent(player, "statusChange", {
-    status: player.status,
-    oldStatus: player.status
-  });
-  const playerStatus = statusEvent?.status || player.status;
-
-  // Enable time-update events for progress tracking
-  useEffect(() => {
-    player.timeUpdateEventInterval = 1;
-  }, [player]);
-
-  // Replace source when episode changes, reset restore flag
-  useEffect(() => {
-    if (videoUrl) {
-      player.replace(videoUrl);
-      player.play();
-      hasRestored.current = false;
-    }
-  }, [videoUrl, player]);
-
-  // Periodically save playback progress to history
+  // 定期保存播放进度
   useEffect(() => {
     if (!currentEpisode?.url || !currentDetail?.id || !currentDetail?.sourceKey) return;
 
     const interval = setInterval(() => {
-      const time = isHlsOnWeb ? hlsTimeRef.current : player.currentTime;
+      const time = isHlsOnWeb ? hlsTimeRef.current : mobileTimeRef.current;
       if (time > 0) {
         updateProgress(currentDetail.id, currentDetail.sourceKey, {
           currentTime: time,
@@ -202,23 +162,40 @@ export function PlayerScreen() {
 
     return () => clearInterval(interval);
   }, [
-    player,
     currentEpisode?.url,
     currentEpisodeIndex,
     currentLineIndex,
     currentDetail?.id,
     currentDetail?.sourceKey,
-    updateProgress
+    updateProgress,
+    isHlsOnWeb
   ]);
 
   function handleRetry() {
     if (isHlsOnWeb) {
       setHlsError(false);
       setHlsRetryKey((k) => k + 1);
-    } else if (videoUrl) {
-      player.replace(videoUrl);
-      player.play();
+    } else {
+      setMobileError(false);
+      setMobileRetryKey((k) => k + 1);
     }
+  }
+
+  function handleBack() {
+    // 离开前保存最终播放位置
+    if (currentDetail?.id && currentDetail?.sourceKey && currentEpisode?.url) {
+      const time = isHlsOnWeb ? hlsTimeRef.current : mobileTimeRef.current;
+      if (time > 0) {
+        updateProgress(currentDetail.id, currentDetail.sourceKey, {
+          currentTime: time,
+          episodeIndex: currentEpisodeIndex,
+          lineIndex: currentLineIndex,
+          episodeUrl: currentEpisode?.url || ""
+        });
+      }
+    }
+    closePlayer();
+    navigation.goBack();
   }
 
   if (!currentDetail) {
@@ -238,30 +215,6 @@ export function PlayerScreen() {
       (availableWidth - EPISODE_GRID_GAP * (columns - 1)) / columns
     );
   }, [windowWidth]);
-
-  function handleBack() {
-    // Save final position before closing
-    if (currentDetail?.id && currentDetail?.sourceKey && currentEpisode?.url) {
-      const time = isHlsOnWeb ? hlsTimeRef.current : player.currentTime;
-      if (time > 0) {
-        updateProgress(currentDetail.id, currentDetail.sourceKey, {
-          currentTime: time,
-          episodeIndex: currentEpisodeIndex,
-          lineIndex: currentLineIndex,
-          episodeUrl: currentEpisode?.url || ""
-        });
-      }
-    }
-    closePlayer();
-    navigation.goBack();
-  }
-
-  function handleOnFirstFrameRender() {
-    if (savedPlaybackTime.current > 0 && !hasRestored.current) {
-      player.currentTime = savedPlaybackTime.current;
-      hasRestored.current = true;
-    }
-  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -284,20 +237,28 @@ export function PlayerScreen() {
             contentFit="contain"
             onError={setHlsError}
             onTimeUpdate={(t) => { hlsTimeRef.current = t; }}
-            onFirstFrameRender={handleOnFirstFrameRender}
+            onFirstFrameRender={() => {}}
             initialTime={savedPlaybackTime.current}
           />
+        ) : filtering ? (
+          <View style={[styles.video, styles.playerOverlay]}>
+            <ActivityIndicator color="#38bdf8" size="large" />
+            <Text style={[styles.playerOverlayText, { marginTop: 12 }]}>
+              加载播放地址...
+            </Text>
+          </View>
         ) : (
-          <VideoView
-            player={player}
+          <PlayerView
+            key={`mobile-${mobileRetryKey}`}
+            uri={filteredUri}
             style={styles.video}
-            nativeControls
-            contentFit="contain"
-            onFirstFrameRender={handleOnFirstFrameRender}
+            initialTime={savedPlaybackTime.current}
+            onTimeUpdate={(t) => { mobileTimeRef.current = t; }}
+            onError={setMobileError}
           />
         )}
 
-        {((isHlsOnWeb ? hlsError : playerStatus === "error")) && (
+        {(isHlsOnWeb ? hlsError : mobileError) && (
           <View style={styles.playerOverlay}>
             <Text style={[styles.playerOverlayText, { fontSize: 16 }]}>播放失败</Text>
             <Pressable style={styles.retryButton} onPress={handleRetry}>
@@ -374,4 +335,3 @@ export function PlayerScreen() {
     </SafeAreaView>
   );
 }
-

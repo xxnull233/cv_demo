@@ -22,7 +22,8 @@ export function getPathDir(url) {
     const parsed = new URL(url);
     const parts = parsed.pathname.split("/").filter(Boolean);
     parts.pop();
-    return parts.slice(-3).join("/");
+    const dir = parts.slice(-3).join("/");
+    return parsed.hostname + (dir ? "/" + dir : "");
   } catch {
     return "";
   }
@@ -42,12 +43,12 @@ export function detectAdSegments(segments, baseUrl) {
 
   // 策略 1：DISCONTINUITY + 路径差异
   const firstDiscIdx = segments.findIndex((s) => s.afterDiscontinuity);
-  if (firstDiscIdx > 1) {
+  if (firstDiscIdx > 0) {
     const pre = segments.slice(0, firstDiscIdx);
     const post = segments.slice(firstDiscIdx);
     const prePaths = [...new Set(pre.map((s) => getPathDir(resolveUrl(baseUrl, s.url))))];
     const postPaths = [...new Set(post.map((s) => getPathDir(resolveUrl(baseUrl, s.url))))];
-    if (prePaths.every((p) => !postPaths.includes(p)) && prePaths.length <= 2 && postPaths.length >= 1) {
+    if (prePaths.every((p) => !postPaths.includes(p)) && postPaths.length >= 1) {
       for (let i = 0; i < firstDiscIdx; i++) adIndices.add(i);
       return adIndices;
     }
@@ -60,7 +61,7 @@ export function detectAdSegments(segments, baseUrl) {
   const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
   if (dominant) {
     const firstDom = paths.indexOf(dominant);
-    if (firstDom > 1) {
+    if (firstDom > 0) {
       const firstPaths = new Set(paths.slice(0, firstDom));
       if ([...firstPaths].every((p) => p !== dominant) && firstPaths.size <= 2) {
         for (let i = 0; i < firstDom; i++) adIndices.add(i);

@@ -91,6 +91,17 @@ export function PlayerScreen() {
         const uid = Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
         const file = new File(Paths.cache, `hls_filtered_${uid}.m3u8`);
         file.write(cleanText);
+
+        // 另存一份到 Documents 供用户查看
+        try {
+          const vidTitle = (currentDetail?.title || "unknown").replace(/[<>:"\/\\|?*]/g, "_").substring(0, 30);
+          const debugName = "hls_" + vidTitle + "_" + uid + ".m3u8.txt";
+          const debugFile = new File(Paths.documents, debugName);
+          debugFile.write(cleanText);
+        } catch (e) {
+          // 调试文件保存为可选功能，静默忽略
+        }
+
         if (!cancelled) {
           mobileFileRef.current = file;
           setMobileFilteredUri(file.uri);

@@ -245,11 +245,13 @@ export function PlayerScreen() {
             initialTime={savedPlaybackTime.current}
           />
         ) : filtering ? (
-          <View style={[styles.video, styles.playerOverlay]}>
-            <ActivityIndicator color="#38bdf8" size="large" />
-            <Text style={[styles.playerOverlayText, { marginTop: 12 }]}>
-              加载播放地址...
-            </Text>
+          <View style={styles.video}>
+            <View style={styles.playerOverlay}>
+              <ActivityIndicator color="#38bdf8" size="large" />
+              <Text style={[styles.playerOverlayText, { marginTop: 12 }]}>
+                加载播放地址...
+              </Text>
+            </View>
           </View>
         ) : (
           <PlayerView
@@ -339,3 +341,5 @@ export function PlayerScreen() {
     </SafeAreaView>
   );
 }
+
+

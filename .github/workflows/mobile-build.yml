@@ -46,6 +46,7 @@ jobs:
 
       - name: Setup Android keystore
         run: |
+          mkdir -p $HOME/keys
           echo "${{ secrets.ANDROID_KEYS_BASE64 }}" | base64 -d > $HOME/keys/keystore.jks
 
       - name: EAS local Android build

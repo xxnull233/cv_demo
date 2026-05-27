@@ -11,10 +11,6 @@ on:
         options:
           - preview
           - production
-      release_tag:
-        description: '发布版本号（留空仅上传 Artifact，填写如 v1.0.0 则自动创建 Release）'
-        required: false
-        default: ''
 
 jobs:
   build:
@@ -24,6 +20,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Read app version
+        id: app_version
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          echo "version=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "App version: v$VERSION"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -69,14 +72,20 @@ jobs:
             android/app/build/outputs/apk/release/*.apk
           if-no-files-found: warn
 
+      - name: Delete existing release & tag (if any)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.app_version.outputs.version }}"
+          gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
+
       - name: Create GitHub Release
-        if: ${{ github.event.inputs.release_tag != '' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          name: ${{ github.event.inputs.release_tag }}
+          tag_name: ${{ steps.app_version.outputs.version }}
+          name: ${{ steps.app_version.outputs.version }}
           body: |
-            ## CV Mobile ${{ github.event.inputs.release_tag }}
+            ## CV Mobile ${{ steps.app_version.outputs.version }}
 
             Profile: `${{ github.event.inputs.profile }}`
             Commit: ${{ github.sha }}

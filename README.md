@@ -1,6 +1,6 @@
-﻿# CV Mobile
+# CV Mobile
 
-Expo 移动端应用（iOS / Android / Web），直连 CMS10 采集站 API，不依赖后端代理层。
+参考libretv编写的Expo 移动端应用（iOS / Android / Web），直连 CMS10 采集站 API，不依赖后端代理层。
 
 ## 运行
 
@@ -12,6 +12,7 @@ npm start
 
 使用 Expo Go、Android 模拟器或 iOS 模拟器打开。
 网络受限时可离线启动：
+
 ```bash
 npm start -- --offline
 ```
@@ -19,11 +20,13 @@ npm start -- --offline
 ### Web 端
 
 Web 端会自动启动本地 CORS 代理，再打开 Expo：
+
 ```bash
 npm run web
 ```
 
 仅启动 Expo Web（不启代理）：
+
 ```bash
 npm run web:direct
 ```
@@ -79,11 +82,13 @@ npm run check            # Babel 编译检查 + 播放地址解析检查
 
 ## 平台说明与播放架构
 
-| 平台 | m3u8 广告过滤方式 | 播放引擎 |
-|------|-----------------|---------|
-| iOS / Android | 本地过滤：`fetch`→`filterSegmentsText`→写入缓存 `file://` | expo-video（AVPlayer / ExoPlayer） |
-| Web（Chrome / Firefox / Edge） | 本地代理过滤：`localhost:19001/m3u8?url=...` | hls.js（通过 MediaSource API） |
-| Web（Safari） | 本地代理过滤：同上 | 原生 `<video>` HLS |
+
+| 平台                           | m3u8 广告过滤方式                                      | 播放引擎                             |
+| ---------------------------- | ------------------------------------------------ | -------------------------------- |
+| iOS / Android                | 本地过滤：`fetch`→`filterSegmentsText`→写入缓存 `file://` | expo-video（AVPlayer / ExoPlayer） |
+| Web（Chrome / Firefox / Edge） | 本地代理过滤：`localhost:19001/m3u8?url=...`            | hls.js（通过 MediaSource API）       |
+| Web（Safari）                  | 本地代理过滤：同上                                        | 原生 `<video>` HLS                 |
+
 
 ### 广告过滤说明
 

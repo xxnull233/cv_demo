@@ -24,7 +24,7 @@ import { styles as playerStyles } from "../styles/player";
 import { styles as sharedStyles } from "../styles/shared";
 import { HlsVideo } from "../components/HlsVideo";
 import { File, Paths } from "expo-file-system";
-import { filterSegmentsText } from "../utils/m3u8Filter";
+import { filterM3u8ByUrl } from "../utils/m3u8Filter";
 
 const styles = { ...sharedStyles, ...playerStyles };
 const PROGRESS_SAVE_INTERVAL = 5000;
@@ -86,11 +86,7 @@ export function PlayerScreen() {
 
     (async () => {
       try {
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const text = await resp.text();
-        const cleanText = filterSegmentsText(text, url);
-        if (!cleanText) throw new Error("过滤结果为空");
+        const { text: cleanText, error } = await filterM3u8ByUrl(url);
 
         const uid = Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
         const file = new File(Paths.cache, `hls_filtered_${uid}.m3u8`);

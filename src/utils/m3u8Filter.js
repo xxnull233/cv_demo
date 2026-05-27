@@ -147,3 +147,38 @@ export function filterSegmentsText(text, baseUrl) {
 
   return resolveAllUrls(filtered, baseUrl);
 }
+
+/**
+ * 对 m3u8 URL 进行完整过滤（支持 Master Playlist 多层递归）
+ * 与 Web 代理（proxy-server.mjs）逻辑一致
+ *
+ * 1. 如果是 Master Playlist → 取最高码率子流 → 递归过滤
+ * 2. 如果是 Media Playlist → filterSegmentsText 去广告
+ *
+ * @param {string} m3u8Url - m3u8 地址
+ * @returns {Promise<{ text: string|null, error?: string }>}
+ */
+export async function filterM3u8ByUrl(m3u8Url) {
+  const resp = await fetch(m3u8Url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const text = await resp.text();
+
+  // 处理 Master Playlist（多码率）：取最高码率子流递归过滤
+  if (text.includes("#EXT-X-STREAM-INF")) {
+    const streams = parseMasterPlaylist(text, m3u8Url);
+    // 按码率从高到低排序，取最高的
+    streams.sort((a, b) => b.bandwidth - a.bandwidth);
+    if (streams.length === 0) {
+      return { text: null, error: "Master playlist has no streams" };
+    }
+    return await filterM3u8ByUrl(streams[0].url);
+  }
+
+  // 处理 Media Playlist（直接含 .ts 片段）
+  const cleanText = filterSegmentsText(text, m3u8Url);
+  if (!cleanText) {
+    return { text: null, error: "All segments filtered as ads or no valid segments" };
+  }
+
+  return { text: cleanText };
+}

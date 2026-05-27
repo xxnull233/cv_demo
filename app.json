@@ -22,7 +22,8 @@
                                  "adaptiveIcon":  {
                                                       "backgroundColor":  "#050505"
                                                   },
-                                 "package":  "com.anonymous.cv"
+                                 "package":  "com.anonymous.cv",
+                                 "versionCode":  1
                              },
                  "extra":  {
                                "eas":  {
@@ -35,7 +36,9 @@
                                      "expo-build-properties",
                                      {
                                          "android":  {
-                                                         "usesCleartextTraffic":  true
+                                                         "usesCleartextTraffic":  true,
+                                                         "enableProguardInReleaseBuilds": true,
+                                                         "enableShrinkResourcesInReleaseBuilds": true
                                                      }
                                      }
                                  ]

@@ -1,16 +1,7 @@
-﻿name: Mobile Build (APK)
+name: Mobile Build (APK)
 
 on:
   workflow_dispatch:
-    inputs:
-      profile:
-        description: 'EAS Build profile（留空，gradle 直接构建）'
-        required: false
-        default: 'preview'
-        type: choice
-        options:
-          - preview
-          - production
 
 jobs:
   build:

@@ -23,8 +23,9 @@ import { usePlayer } from "../context/PlayerContext";
 import { styles as playerStyles } from "../styles/player";
 import { styles as sharedStyles } from "../styles/shared";
 import { HlsVideo } from "../components/HlsVideo";
-import { File, Paths } from "expo-file-system";
+import { File, Paths, StorageAccessFramework } from "expo-file-system";
 import { filterM3u8ByUrl } from "../utils/m3u8Filter";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const styles = { ...sharedStyles, ...playerStyles };
 const PROGRESS_SAVE_INTERVAL = 5000;
@@ -92,16 +93,32 @@ export function PlayerScreen() {
         const file = new File(Paths.cache, `hls_filtered_${uid}.m3u8`);
         file.write(cleanText);
 
-        // 另存一份到 Documents 供用户查看
+        // 另存一份到 Downloads 供用户查看
         try {
-          const vidTitle = (currentDetail?.title || "unknown").replace(/[<>:"\/\\|?*]/g, "_").substring(0, 30);
+          const vidTitle = (currentDetail?.title || "unknown").replace(/[<>:"/\\|?*]/g, "_").substring(0, 30);
           const debugName = "hls_" + vidTitle + "_" + uid + ".m3u8.txt";
-          const debugFile = new File(Paths.documents, debugName);
-          debugFile.write(cleanText);
+          if (Platform.OS === "android") {
+            let downloadsUri = await AsyncStorage.getItem("debug_downloads_uri");
+            if (!downloadsUri) {
+              const perm = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+              if (perm.granted) {
+                downloadsUri = perm.directoryUri;
+                await AsyncStorage.setItem("debug_downloads_uri", downloadsUri);
+              }
+            }
+            if (downloadsUri) {
+              const fileUri = await StorageAccessFramework.createFileAsync(
+                downloadsUri, debugName, "text/plain"
+              );
+              await StorageAccessFramework.writeAsStringAsync(fileUri, cleanText);
+            }
+          } else {
+            const debugFile = new File(Paths.documents, debugName);
+            debugFile.write(cleanText);
+          }
         } catch (e) {
           // 调试文件保存为可选功能，静默忽略
         }
-
         if (!cancelled) {
           mobileFileRef.current = file;
           setMobileFilteredUri(file.uri);

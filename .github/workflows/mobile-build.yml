@@ -63,8 +63,11 @@ jobs:
       - name: Upload APK (Actions Artifact)
         uses: actions/upload-artifact@v4
         with:
-          name: app-release.apk
-          path: build-*.apk
+          name: app-apks
+          path: |
+            build-*.apk
+            android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
 
       - name: Create GitHub Release
         if: ${{ github.event.inputs.release_tag != '' }}
@@ -77,7 +80,9 @@ jobs:
 
             Profile: `${{ github.event.inputs.profile }}`
             Commit: ${{ github.sha }}
-          files: build-*.apk
+          files: |
+            build-*.apk
+            android/app/build/outputs/apk/release/*.apk
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

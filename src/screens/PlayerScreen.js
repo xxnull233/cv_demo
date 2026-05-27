@@ -24,7 +24,7 @@ import { styles as playerStyles } from "../styles/player";
 import { styles as sharedStyles } from "../styles/shared";
 import { HlsVideo } from "../components/HlsVideo";
 import { PlayerView } from "../components/PlayerView";
-import { File, Paths } from "expo-file-system";
+import { cacheDirectory, writeAsStringAsync, deleteAsync } from "expo-file-system";
 import { filterM3u8ByUrl } from "../utils/m3u8Filter";
 
 const styles = { ...sharedStyles, ...playerStyles };
@@ -71,7 +71,7 @@ export function PlayerScreen() {
   const [filteredUri, setFilteredUri] = useState(null);
   const [mobileRetryKey, setMobileRetryKey] = useState(0);
   const [mobileError, setMobileError] = useState(false);
-  const mobileFileRef = useRef(null);
+  const mobileFileRef = useRef(null); // 缓存文件路径 (string)
   const mobileTimeRef = useRef(0); // PlayerView 定期同步 currentTime 到此 ref
 
   // Compute episode/line info (safe when currentDetail is null)
@@ -87,7 +87,7 @@ export function PlayerScreen() {
   useEffect(() => {
     // 清理上一集的缓存文件
     if (mobileFileRef.current) {
-      try { mobileFileRef.current.delete(); } catch {}
+      try { deleteAsync(mobileFileRef.current); } catch {}
       mobileFileRef.current = null;
     }
 
@@ -107,6 +107,10 @@ export function PlayerScreen() {
 
     (async () => {
       try {
+        if (!cacheDirectory) {
+          throw new Error("cacheDirectory is null");
+        }
+
         const { text: cleanText } = await filterM3u8ByUrl(url);
 
         if (cancelled) return;
@@ -119,16 +123,16 @@ export function PlayerScreen() {
         }
 
         const uid = Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
-        const file = new File(Paths.cache, `hls_filtered_${uid}.m3u8`);
-        file.write(cleanText);
+        const filePath = `${cacheDirectory}hls_filtered_${uid}.m3u8`;
+        await writeAsStringAsync(filePath, cleanText);
 
         if (cancelled) {
-          try { file.delete(); } catch {}
+          try { deleteAsync(filePath); } catch {}
           return;
         }
 
-        mobileFileRef.current = file;
-        setFilteredUri(file.uri);
+        mobileFileRef.current = filePath;
+        setFilteredUri(filePath);
         setFiltering(false);
       } catch (e) {
         if (cancelled) return;

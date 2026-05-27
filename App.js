@@ -13,13 +13,12 @@ import { ErrorBoundary } from "./src/components/ErrorBoundary";
 async function cleanupHlsCache() {
   if (Platform.OS === "web") return;
   try {
-    const { File, Paths } = await import("expo-file-system");
-    const cacheDir = Paths.cache;
-    if (!cacheDir.exists) return;
-    const entries = cacheDir.list();
+    const { cacheDirectory, readDirectoryAsync, deleteAsync } = await import("expo-file-system");
+    if (!cacheDirectory) return;
+    const entries = await readDirectoryAsync(cacheDirectory);
     for (const entry of entries) {
-      if (entry instanceof File && entry.name?.startsWith("hls_filtered_")) {
-        try { entry.delete(); } catch {}
+      if (entry.startsWith("hls_filtered_")) {
+        try { await deleteAsync(cacheDirectory + entry); } catch {}
       }
     }
   } catch {}

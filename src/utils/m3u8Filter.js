@@ -13,7 +13,7 @@ function parseSegments(text) {
   let currentExtinf = null;
   let currentExtinfLine = -1;
   let currentKey = null;
-  let hasDiscontinuity = false;
+  let discontinuityCount = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
@@ -26,13 +26,13 @@ function parseSegments(text) {
     } else if (l.startsWith("#EXT-X-KEY:")) {
       currentKey = l;
     } else if (l.startsWith("#EXT-X-DISCONTINUITY")) {
-      hasDiscontinuity = true;
+      discontinuityCount++;
     } else if (!l.startsWith("#")) {
       segments.push({
         url: l,
         duration: currentExtinf || 0,
         key: currentKey,
-        afterDiscontinuity: hasDiscontinuity,
+        afterDiscontinuity: discontinuityCount > 0,
         urlLineIndex: i,
         extinfLineIndex: currentExtinfLine,
       });
@@ -47,7 +47,7 @@ function parseSegments(text) {
 // ─── 原地删除广告分段 ────────────────────────────────────────────
 
 function removeAdLines(text, segments, adIndices) {
-  if (adIndices.size === 0) return null;
+  if (adIndices.size === 0) return text;
 
   const lines = text.split("\n");
   const removeSet = new Set();

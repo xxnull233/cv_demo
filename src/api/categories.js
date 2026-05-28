@@ -1,4 +1,4 @@
-﻿import { API_HEADERS } from "./sites";
+﻿import { API_HEADERS } from "../constants/app";
 import { resolveUrl, withTimeout, normalizeApiBase } from "./utils";
 import { stripHtml } from "./parsers";
 

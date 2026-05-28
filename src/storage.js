@@ -1,68 +1,75 @@
 ﻿import AsyncStorage from "@react-native-async-storage/async-storage";
-import { DEFAULT_SELECTED_SOURCES } from "./api/sites";
 
-const SOURCE_KEY = "libretv.mobile.selectedSources";
-const CUSTOM_SOURCE_KEY = "libretv.mobile.customSources";
+const ALL_SOURCES_KEY = "libretv.mobile.allSources";
 const HISTORY_KEY = "libretv.mobile.history";
 
-export async function loadSelectedSources() {
-  const raw = await AsyncStorage.getItem(SOURCE_KEY);
-  if (!raw) return DEFAULT_SELECTED_SOURCES;
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_SELECTED_SOURCES;
-  } catch {
-    return DEFAULT_SELECTED_SOURCES;
-  }
-}
-
-export async function saveSelectedSources(sourceKeys) {
-  await AsyncStorage.setItem(SOURCE_KEY, JSON.stringify(sourceKeys));
-}
-
-function normalizeCustomSource(source) {
-  if (!source || typeof source !== "object") return null;
-  const key = String(source.key || "").trim();
-  const name = String(source.name || "").trim();
-  const api = String(source.api || "").trim();
-  const detail = String(source.detail || "").trim();
-  if (!key || !name || !api) return null;
-  return {
-    key,
-    name,
-    api,
-    detail,
-    isCustom: true
-  };
-}
-
-export async function loadCustomSources() {
-  const raw = await AsyncStorage.getItem(CUSTOM_SOURCE_KEY);
+export async function loadAllSources() {
+  const raw = await AsyncStorage.getItem("libretv.mobile.allSources");
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map(normalizeCustomSource).filter(Boolean);
-  } catch {
-    return [];
+    return Array.isArray(parsed) ? parsed.filter(s => s && s.name && s.api) : [];
+  } catch { return []; }
+}
+
+export async function saveAllSources(sources) {
+  const valid = Array.isArray(sources) ? sources.filter(s => s && s.name && s.api) : [];
+  await AsyncStorage.setItem("libretv.mobile.allSources", JSON.stringify(valid));
+}
+
+export function importSourcesFromJson(jsonString, existingSources) {
+  let imported;
+  try { imported = JSON.parse(jsonString); }
+  catch(e) { throw new Error("JSON 解析失败"); }
+  if (!Array.isArray(imported)) throw new Error("数据格式错误，应为数组");
+  const result = existingSources.slice();
+  for (let i = 0; i < imported.length; i++) {
+    const item = imported[i];
+    if (!item.name || !item.api) continue;
+    let existingIndex = -1;
+    for (let j = 0; j < result.length; j++) {
+      if (result[j].api === item.api || (item.key && result[j].key === item.key)) {
+        existingIndex = j; break;
+      }
+    }
+    const key = item.key || Math.random().toString(36).substring(2,10);
+    const source = { key: key, name: String(item.name).trim(), api: String(item.api).trim(), excludeClass: typeof item.excludeClass === "string" ? item.excludeClass : "", enabled: item.enabled !== false };
+    if (existingIndex >= 0) {
+      source.enabled = result[existingIndex].enabled;
+      result[existingIndex] = source;
+    } else { result.push(source); }
   }
+  return result;
 }
 
-export async function saveCustomSources(sources) {
-  const normalized = Array.isArray(sources)
-    ? sources.map(normalizeCustomSource).filter(Boolean)
-    : [];
-  await AsyncStorage.setItem(CUSTOM_SOURCE_KEY, JSON.stringify(normalized));
+export async function importSourcesFromUrl(url, existingSources) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("网络请求失败: HTTP " + response.status);
+  const text = await response.text();
+  return importSourcesFromJson(text, existingSources);
 }
 
-export async function loadSourceSettings() {
-  const [selectedSources, customSources] = await Promise.all([
-    loadSelectedSources(),
-    loadCustomSources()
-  ]);
-  return { selectedSources, customSources };
+export function exportSources(sources) {
+  const data = sources.map(function(s) { return { name: s.name, api: s.api, excludeClass: s.excludeClass || "", enabled: s.enabled !== false };});
+  return JSON.stringify(data, null, 2);
 }
 
+export async function migrateOldSources() {
+  const r1 = await AsyncStorage.getItem("libretv.mobile.selectedSources");
+  const r2 = await AsyncStorage.getItem("libretv.mobile.customSources");
+  if (!r1 && !r2) return;
+  const existing = await loadAllSources();
+  if (existing.length > 0) return;
+  try {
+    const custom = r2 ? JSON.parse(r2) : [];
+    if (Array.isArray(custom) && custom.length) {
+      const migrated = custom.map(function(cs) { return { key: cs.key, name: cs.name, api: cs.api, excludeClass: "", enabled: true }; });
+      await saveAllSources(migrated);
+    }
+  } catch(e) {}
+  await AsyncStorage.removeItem("libretv.mobile.selectedSources");
+  await AsyncStorage.removeItem("libretv.mobile.customSources");
+}
 export async function loadHistory() {
   const raw = await AsyncStorage.getItem(HISTORY_KEY);
   if (!raw) return [];
@@ -240,6 +247,8 @@ export async function deleteFavoriteFolder(folderId) {
   await saveFavorites(fav);
   return fav;
 }
+
+
 
 
 

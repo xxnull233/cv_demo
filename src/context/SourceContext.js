@@ -1,123 +1,110 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-
-import { API_SITES } from "../api/sites";
+﻿import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
-  loadCustomSources,
-  loadSelectedSources,
-  saveCustomSources,
-  saveSelectedSources
+  loadAllSources,
+  saveAllSources,
+  importSourcesFromJson,
+  importSourcesFromUrl,
+  exportSources,
+  migrateOldSources
 } from "../storage";
 
-const SOURCE_ENTRIES = Object.entries(API_SITES);
 const SourceContext = createContext(null);
 
+function generateKey() {
+  return Math.random().toString(36).substring(2, 10);
+}
+
 export function SourceProvider({ children }) {
-  const [selectedSources, setSelectedSources] = useState([]);
-  const [customSources, setCustomSources] = useState([]);
+  const [sources, setSources] = useState([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadSelectedSources(), loadCustomSources()]).then(([selected, custom]) => {
-      if (!cancelled) {
-        setSelectedSources(selected);
-        setCustomSources(custom);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
+    (async () => {
+      await migrateOldSources();
+      const all = await loadAllSources();
+      if (!cancelled) { setSources(all); setLoaded(true); }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
-  const sourceMap = useMemo(() => {
-    const map = { ...API_SITES };
-    for (const cs of customSources) {
-      map[cs.key] = cs;
+  const derived = useMemo(() => {
+    const map = {};
+    const entries = [];
+    const keysForSearch = [];
+    for (let i = 0; i < sources.length; i++) {
+      const s = sources[i];
+      map[s.key] = s;
+      entries.push([s.key, s]);
+      if (s.enabled) keysForSearch.push(s.key);
     }
-    return map;
-  }, [customSources]);
-
-  const sourceEntries = useMemo(
-    () => [...SOURCE_ENTRIES, ...customSources.map((cs) => [cs.key, cs])],
-    [customSources]
-  );
-
-  const sourceKeysForSearch = useMemo(
-    () => [...selectedSources, ...customSources.map((cs) => cs.key)],
-    [selectedSources, customSources]
-  );
+    return { map, entries, keysForSearch };
+  }, [sources]);
 
   async function toggleSource(sourceKey) {
-    const next = selectedSources.includes(sourceKey)
-      ? selectedSources.filter((key) => key !== sourceKey)
-      : [...selectedSources, sourceKey];
-    setSelectedSources(next);
-    await saveSelectedSources(next);
+    const next = sources.map(function(s) {
+      if (s.key === sourceKey) { return { ...s, enabled: !s.enabled }; }
+      return s;
+    });
+    await saveAllSources(next);
+    setSources(next);
   }
 
-  async function selectAllSources() {
-    const allKeys = [...SOURCE_ENTRIES.map(([key]) => key), ...customSources.map((cs) => cs.key)];
-    setSelectedSources(allKeys);
-    await saveSelectedSources(allKeys);
-  }
-
-  async function resetDefaultSources() {
-    const defaultKeys = SOURCE_ENTRIES.map(([key]) => key);
-    setSelectedSources(defaultKeys);
-    await saveSelectedSources(defaultKeys);
-  }
-
-  async function saveCustomSource(source, editingKey) {
-    const isApiDuplicate = [...SOURCE_ENTRIES, ...customSources].some(
-      ([k, s]) => (!editingKey || k !== editingKey) && s.api === source.api
-    );
-    if (isApiDuplicate) {
-      alert("该 API 地址已存在，请勿重复添加");
-      return false;
-    }
-
-    const key = editingKey || Math.random().toString(36).substring(2, 10);
-    const newSource = { ...source, key, isCustom: true };
-
-    let updated;
-    if (editingKey) {
-      updated = customSources.map((cs) => (cs.key === editingKey ? newSource : cs));
-    } else {
-      updated = [...customSources, newSource];
-    }
-
-    setCustomSources(updated);
-    await saveCustomSources(updated);
-
-    if (!editingKey && !selectedSources.includes(key)) {
-      const newSelected = [...selectedSources, key];
-      setSelectedSources(newSelected);
-      await saveSelectedSources(newSelected);
-    }
+  async function addSource(name, api, excludeClass, enabled) {
+    const source = { key: generateKey(), name: String(name).trim(), api: String(api).trim(), excludeClass: typeof excludeClass === "string" ? excludeClass : "", enabled: enabled !== false };
+    const next = sources.concat([source]);
+    await saveAllSources(next);
+    setSources(next);
     return true;
   }
 
-  async function deleteCustomSource(key) {
-    const updated = customSources.filter((cs) => cs.key !== key);
-    setCustomSources(updated);
-    await saveCustomSources(updated);
-    if (selectedSources.includes(key)) {
-      const newSelected = selectedSources.filter((k) => k !== key);
-      setSelectedSources(newSelected);
-      await saveSelectedSources(newSelected);
-    }
+  async function editSource(key, updates) {
+    const next = sources.map(function(s) {
+      if (s.key === key) { return { ...s, name: String(updates.name || s.name).trim(), api: String(updates.api || s.api).trim(), excludeClass: typeof updates.excludeClass === "string" ? updates.excludeClass : s.excludeClass }; }
+      return s;
+    });
+    await saveAllSources(next);
+    setSources(next);
+    return true;
+  }
+
+  async function deleteSource(key) {
+    var next = sources.filter(function(s) { return s.key !== key; });
+    await saveAllSources(next);
+    setSources(next);
+  }
+
+  async function importFromJson(jsonString) {
+    const merged = importSourcesFromJson(jsonString, sources);
+    await saveAllSources(merged);
+    setSources(merged);
+    return merged.length;
+  }
+
+  async function importFromUrl(url) {
+    const merged = await importSourcesFromUrl(url, sources);
+    await saveAllSources(merged);
+    setSources(merged);
+    return merged.length;
+  }
+
+  function exportToJson() {
+    return exportSources(sources);
   }
 
   const value = {
-    selectedSources,
-    customSources,
-    sourceMap,
-    sourceEntries,
-    sourceKeysForSearch,
+    sources,
+    loaded,
+    sourceMap: derived.map,
+    sourceEntries: derived.entries,
+    sourceKeysForSearch: derived.keysForSearch,
     toggleSource,
-    selectAllSources,
-    resetDefaultSources,
-    saveCustomSource,
-    deleteCustomSource
+    addSource,
+    editSource,
+    deleteSource,
+    importFromJson,
+    importFromUrl,
+    exportToJson
   };
 
   return <SourceContext.Provider value={value}>{children}</SourceContext.Provider>;
@@ -125,8 +112,7 @@ export function SourceProvider({ children }) {
 
 export function useSources() {
   const context = useContext(SourceContext);
-  if (!context) {
-    throw new Error("useSources must be used within SourceProvider");
-  }
+  if (!context) { throw new Error("useSources must be used within SourceProvider"); }
   return context;
 }
+

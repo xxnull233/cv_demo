@@ -5,7 +5,7 @@ import { usePlayer } from "../context/PlayerContext";
 
 export function useOpenResult() {
   const navigation = useNavigation();
-  const { openResult, detailLoading } = usePlayer();
+  const { openResult, detailLoading, detailError } = usePlayer();
 
   const openResultAndPlay = useCallback(
     async (result) => {
@@ -17,5 +17,5 @@ export function useOpenResult() {
     [navigation, openResult]
   );
 
-  return { openResult: openResultAndPlay, detailLoading };
+  return { openResult: openResultAndPlay, detailLoading, detailError };
 }

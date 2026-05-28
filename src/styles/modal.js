@@ -80,10 +80,6 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     maxWidth: 250
   },
-  sourceControls: {
-    alignItems: "flex-end",
-    gap: 8
-  },
   sourceCheck: {
     fontWeight: "800",
     fontSize: 13,
@@ -91,16 +87,6 @@ export const styles = StyleSheet.create({
   },
   sourceCheckActive: {
     color: "#38bdf8"
-  },
-  sourceActionText: {
-    color: "#d4d4d4",
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  sourceDangerText: {
-    color: "#fecaca",
-    fontSize: 12,
-    fontWeight: "800"
   },
   sourceForm: { borderWidth: 1, borderColor: "#242424", borderRadius: 12, padding: 14, marginTop: 14 },
   formTitle: {
@@ -142,27 +128,6 @@ export const styles = StyleSheet.create({
     color: "#050505",
     fontSize: 13,
     fontWeight: "800"
-  },
-  historyRow: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#202020",
-    paddingVertical: 14,
-    paddingHorizontal: 4
-  },
-  clearButton: {
-    marginTop: 18,
-    marginBottom: 28,
-    borderRadius: 10,
-    paddingVertical: 14,
-    backgroundColor: "#2a1212",
-    borderWidth: 1,
-    borderColor: "#5a2020"
-  },
-  clearButtonText: {
-    color: "#fecaca",
-    textAlign: "center",
-    fontWeight: "800",
-    fontSize: 14
   },
   favoriteVideoTitle: {
     color: "#a0a0a0",

@@ -1,5 +1,5 @@
-﻿import { API_HEADERS } from "./sites";
-import { resolveUrl, withTimeout, normalizeApiBase } from "./utils";
+﻿import { API_HEADERS } from "../constants/app";
+import { resolveUrl, withTimeout, normalizeApiBase, pLimit } from "./utils";
 import {
   linesFromText,
   parseLinesFromPlayUrl,
@@ -9,6 +9,7 @@ import {
 
 const SEARCH_TIMEOUT = 9000;
 const DETAIL_TIMEOUT = 10000;
+const SEARCH_CONCURRENCY = 5;
 
 function getSearchUrl(site, query, page = 1) {
   const base = normalizeApiBase(site.api);
@@ -32,22 +33,6 @@ async function fetchJson(url, timeout) {
       throw new Error("HTTP " + response.status);
     }
     return await response.json();
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-async function fetchText(url, timeout) {
-  const { controller, timeoutId } = withTimeout(timeout);
-  try {
-    const response = await fetch(resolveUrl(url), {
-      headers: { Accept: "text/html,*/*" },
-      signal: controller.signal
-    });
-    if (!response.ok) {
-      throw new Error("HTTP " + response.status);
-    }
-    return await response.text();
   } finally {
     clearTimeout(timeoutId);
   }
@@ -78,31 +63,12 @@ export async function searchSource(sourceKey, query, sourceMap) {
 }
 
 export async function searchManySources(sourceKeys, query, sourceMap) {
+  const limit = pLimit(SEARCH_CONCURRENCY);
   const batches = await Promise.all(
-    sourceKeys.map((key) => searchSource(key, query, sourceMap))
+    sourceKeys.map((key) => limit(() => searchSource(key, query, sourceMap)))
   );
   const merged = batches.flat();
   return uniqueBy(merged, (item) => item.sourceKey + ":" + item.id);
-}
-
-async function loadHtmlDetail(site, id, sourceKey) {
-  if (!site.detail) return null;
-
-  const detailUrl = normalizeApiBase(site.detail) + "/index.php/vod/detail/id/" + encodeURIComponent(id) + ".html";
-  const html = await fetchText(detailUrl, DETAIL_TIMEOUT);
-  const title = html.match(/<h1[^>]*>([^<]+)<\/h1>/i)?.[1]?.trim() || "";
-  const desc = html.match(/<div[^>]*class=["']sketch["'][^>]*>([\s\S]*?)<\/div>/i)?.[1] || "";
-  const lines = linesFromText(html);
-
-  return {
-    title,
-    desc: stripHtml(desc),
-    sourceKey,
-    sourceName: site.name,
-    lines,
-    episodes: lines[0]?.episodes || [],
-    detailUrl
-  };
 }
 
 export async function loadDetail(result, sourceMap) {
@@ -136,14 +102,7 @@ export async function loadDetail(result, sourceMap) {
       detailUrl: getDetailUrl(site, result.id)
     };
   } catch (jsonError) {
-    if (!site.detail) throw jsonError;
-    const htmlDetail = await loadHtmlDetail(site, result.id, result.sourceKey);
-    if (!htmlDetail || htmlDetail.episodes.length === 0) throw jsonError;
-    return {
-      ...htmlDetail,
-      title: htmlDetail.title || result.title,
-      poster: result.poster,
-      type: result.type
-    };
+    throw jsonError;
   }
 }
+

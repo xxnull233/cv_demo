@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useEffect, useState } from "react";
+﻿import { createContext, useContext, useEffect, useRef, useState } from "react";
 
 import { FavoriteFolderModal } from "../components/FavoriteFolderModal";
 import {
@@ -18,7 +18,8 @@ export function FavoritesProvider({ children }) {
   const [favorites, setFavorites] = useState(getDefaultFavorites);
   const [lastFavoriteFolderId, setLastFavoriteFolderId] = useState("");
   const [pickerVisible, setPickerVisible] = useState(false);
-  const [pickerVideo, setPickerVideo] = useState(null);
+    const [pickerVideo, setPickerVideo] = useState(null);
+  const processingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,9 +41,11 @@ export function FavoritesProvider({ children }) {
   }
 
   async function handleFavoritePress(video) {
+    if (processingRef.current) return;
+    processingRef.current = true;
     if (checkIsFavorited(video)) {
       const updated = await removeFavorite(video.id, video.sourceKey);
-      setFavorites(updated);
+      processingRef.current = false;
       return;
     }
 
@@ -56,15 +59,15 @@ export function FavoritesProvider({ children }) {
   }
 
   async function addToFolder(video, folderId) {
+  async function addToFolder(video, folderId) {
     const updated = await addFavorite(video, folderId);
     setFavorites(updated);
     setLastFavoriteFolderId(folderId);
     setPickerVisible(false);
     setPickerVideo(null);
+    processingRef.current = false;
   }
-
-  function closePicker() {
-    setPickerVisible(false);
+    processingRef.current = false;
     setPickerVideo(null);
   }
 
@@ -123,5 +126,7 @@ export function useFavorites() {
   }
   return context;
 }
+
+
 
 

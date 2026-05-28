@@ -1,6 +1,5 @@
-import { useNavigation } from "@react-navigation/native";
+﻿import { useNavigation } from "@react-navigation/native";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
-import { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -11,12 +10,9 @@ import {
   View
 } from "react-native";
 
-import { HistoryModal } from "../components/HistoryModal";
 import { ResultCard } from "../components/ResultCard";
-import { SettingsModal } from "../components/SettingsModal";
 import { APP_NAME } from "../constants/app";
 import { useFavorites } from "../context/FavoritesContext";
-import { useHistory } from "../context/HistoryContext";
 import { useSearch } from "../context/SearchContext";
 import { useSources } from "../context/SourceContext";
 import { useOpenResult } from "../hooks/useOpenResult";
@@ -27,32 +23,12 @@ const styles = { ...sharedStyles, ...homeStyles };
 
 export function HomeScreen() {
   const navigation = useNavigation();
-  const { query, setQuery, results, loading, resultCountLabel, handleSearch } = useSearch();
-  const {
-    selectedSources,
-    sourceEntries,
-    toggleSource,
-    selectAllSources,
-    resetDefaultSources,
-    saveCustomSource,
-    deleteCustomSource
-  } = useSources();
-  const { history, clearAllHistory } = useHistory();
+  const { query, setQuery, results, loading, searchError, searchedOnce, resultCountLabel, handleSearch } = useSearch();
+  const { sources } = useSources();
   const { favorites, checkIsFavorited, handleFavoritePress } = useFavorites();
-  const { openResult, detailLoading } = useOpenResult();
+  const { openResult, detailLoading, detailError } = useOpenResult();
 
-  const [settingsVisible, setSettingsVisible] = useState(false);
-  const [historyVisible, setHistoryVisible] = useState(false);
 
-  async function handleOpenHistory(historyItem) {
-    setHistoryVisible(false);
-    await openResult(historyItem);
-  }
-
-  async function handleClearHistory() {
-    await clearAllHistory();
-    setHistoryVisible(false);
-  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -68,89 +44,92 @@ export function HomeScreen() {
           <Pressable style={styles.iconButton} onPress={() => navigation.navigate("Favorites")}>
             <Text style={styles.iconButtonText}>收藏</Text>
           </Pressable>
-          <Pressable style={styles.iconButton} onPress={() => setHistoryVisible(true)}>
+          <Pressable style={styles.iconButton} onPress={() => navigation.navigate("History")}>
             <Text style={styles.iconButtonText}>历史</Text>
           </Pressable>
-          <Pressable style={styles.iconButton} onPress={() => setSettingsVisible(true)}>
+          <Pressable style={styles.iconButton} onPress={() => navigation.navigate("Settings")}>
             <Text style={styles.iconButtonText}>设置</Text>
           </Pressable>
         </View>
       </View>
 
-      <View style={styles.searchPanel}>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="搜索电影、剧集、动漫"
-          placeholderTextColor="#737373"
-          style={styles.searchInput}
-          returnKeyType="search"
-          onSubmitEditing={handleSearch}
-        />
-        <Pressable style={styles.searchButton} onPress={handleSearch} disabled={loading}>
-          <Text style={styles.searchButtonText}>{loading ? "..." : "搜索"}</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.statusRow}>
-        <Text style={styles.statusText}>{resultCountLabel}</Text>
-        <Text style={styles.statusText}>已选 {selectedSources.length} 个源</Text>
-      </View>
-
-      {loading ? (
+      {sources && sources.length === 0 ? (
         <View style={styles.centerState}>
-          <ActivityIndicator color="#38bdf8" size="large" />
-          <Text style={styles.centerText}>正在搜索...</Text>
+          <Text style={styles.centerTitle}>暂无数据源</Text>
+          <Text style={styles.centerText}>请点击右上角设置 → 导入数据源</Text>
         </View>
       ) : (
-        <FlatList
-          data={results}
-          renderItem={({ item }) => (
-            <ResultCard
-              item={item}
-              onOpen={openResult}
-              onFavorite={handleFavoritePress}
-              isFavorited={checkIsFavorited(item)}
+        <>
+          <View style={styles.searchPanel}>
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="搜索电影、剧集、动漫"
+              placeholderTextColor="#737373"
+              style={styles.searchInput}
+              returnKeyType="search"
+              onSubmitEditing={handleSearch}
             />
-          )}
-          keyExtractor={(item) => `${item.sourceKey}-${item.id}`}
-          extraData={favorites}
-          contentContainerStyle={styles.listContent}
-          keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={
-            <View style={styles.centerState}>
-              <Text style={styles.centerTitle}>输入关键字开始搜索</Text>
-              <Text style={styles.centerText} />
+            <Pressable style={styles.searchButton} onPress={handleSearch} disabled={loading}>
+              <Text style={styles.searchButtonText}>{loading ? "..." : "搜索"}</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.statusRow}>
+            <Text style={styles.statusText}>{resultCountLabel}</Text>
+            <Text style={styles.statusText}>已选 {sources.filter(s => s.enabled).length} 个源</Text>
+          </View>
+
+          <FlatList
+            data={results}
+            renderItem={({ item }) => (
+              <ResultCard
+                item={item}
+                onOpen={openResult}
+                onFavorite={handleFavoritePress}
+                isFavorited={checkIsFavorited(item)}
+              />
+            )}
+            keyExtractor={(item) => item.sourceKey + String.fromCharCode(45) + item.id}
+            extraData={favorites}
+            contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={
+              loading ? (
+                <View style={styles.centerState}>
+                  <ActivityIndicator color="#38bdf8" size="large" />
+                  <Text style={{ color: "#8a8a8a", fontSize: 13, marginTop: 10 }}>正在搜索...</Text>
+                </View>
+              ) : searchError ? (
+                <View style={styles.centerState}>
+                  <Text style={styles.centerTitle}>{searchError}</Text>
+                </View>
+              ) : !searchedOnce ? (
+                <View style={styles.centerState}>
+                  <Text style={styles.centerTitle}>输入关键字开始搜索</Text>
+                  <Text style={styles.centerText} />
+                </View>
+              ) : null
+            }
+            ListFooterComponent={
+              loading && results.length > 0 ? (
+                <View style={{ paddingVertical: 20, alignItems: "center" }}>
+                  <ActivityIndicator color="#38bdf8" size="small" />
+                </View>
+              ) : null
+            }
+          />
+
+          {detailLoading && (
+            <View style={styles.overlay}>
+              <ActivityIndicator color="#38bdf8" size="large" />
+              <Text style={styles.overlayText}>{detailError || "加载详情..."}</Text>
             </View>
-          }
-        />
+          )}
+        </>
       )}
 
-      {detailLoading && (
-        <View style={styles.overlay}>
-          <ActivityIndicator color="#38bdf8" size="large" />
-          <Text style={styles.overlayText}>加载详情...</Text>
-        </View>
-      )}
-
-      <SettingsModal
-        visible={settingsVisible}
-        selectedSources={selectedSources}
-        sourceEntries={sourceEntries}
-        onClose={() => setSettingsVisible(false)}
-        onToggle={toggleSource}
-        onSelectAll={selectAllSources}
-        onResetDefault={resetDefaultSources}
-        onSaveCustomSource={saveCustomSource}
-        onDeleteCustomSource={deleteCustomSource}
-      />
-      <HistoryModal
-        visible={historyVisible}
-        history={history}
-        onClose={() => setHistoryVisible(false)}
-        onClear={handleClearHistory}
-        onOpen={handleOpenHistory}
-      />
     </SafeAreaView>
   );
 }
+

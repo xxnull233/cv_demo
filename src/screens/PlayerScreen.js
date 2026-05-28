@@ -26,12 +26,39 @@ import { HlsVideo } from "../components/HlsVideo";
 import { PlayerView } from "../components/PlayerView";
 import { cacheDirectory, writeAsStringAsync, deleteAsync } from "expo-file-system";
 import { filterM3u8ByUrl } from "../utils/m3u8Filter";
+import { PROXY_BASE } from "../constants/app";
 
 const styles = { ...sharedStyles, ...playerStyles };
-const PROGRESS_SAVE_INTERVAL = 5000;
-const PROXY_BASE = "http://localhost:19001";
+const PROGRESS_SAVE_INTERVAL = 3000;
+const PROGRESS_SAVE_THRESHOLD = 10;
 
-// 在 Web 端将 m3u8 URL 路由到本地代理进行广告过滤 + 绝对路径展开
+// m3u8 过滤结果内存缓存（按 URL 缓存，30 分钟 TTL）
+const M3U8_FILTER_CACHE_TTL = 30 * 60 * 1000;
+const m3u8FilterCache = new Map();
+function getM3u8CacheKey(url) {
+  // 取到最后一个 / 之前的部分作为缓存 key，相同路径的剧集复用
+  const idx = url.lastIndexOf('/');
+  return idx > 0 ? url.substring(0, idx) : url;
+}
+function getCachedFilter(url) {
+  const key = getM3u8CacheKey(url);
+  const entry = m3u8FilterCache.get(key);
+  if (entry && Date.now() - entry.timestamp < M3U8_FILTER_CACHE_TTL) {
+    return entry.result;
+  }
+  m3u8FilterCache.delete(key);
+  return null;
+}
+function setCachedFilter(url, result) {
+  const key = getM3u8CacheKey(url);
+  m3u8FilterCache.set(key, { result, timestamp: Date.now() });
+  // 控制缓存大小，超过 10 条删除最旧的
+  if (m3u8FilterCache.size > 10) {
+    const oldest = m3u8FilterCache.keys().next().value;
+    m3u8FilterCache.delete(oldest);
+  }
+}
+
 function getPlayerUrl(url) {
   if (!url) return null;
   if (Platform.OS === "web" && url.includes(".m3u8")) {
@@ -73,7 +100,7 @@ export function PlayerScreen() {
   const [mobileError, setMobileError] = useState(false);
   const mobileFileRef = useRef(null); // 缓存文件路径 (string)
   const mobileTimeRef = useRef(0); // PlayerView 定期同步 currentTime 到此 ref
-
+  const lastSavedTimeRef = useRef(0); // 上次保存的播放时间，用于脏检查
   // Compute episode/line info (safe when currentDetail is null)
   const currentLine = currentDetail?.lines?.[currentLineIndex];
   const episodes = currentLine?.episodes || currentDetail?.episodes || [];
@@ -83,7 +110,7 @@ export function PlayerScreen() {
   const isMobileM3u8 = Platform.OS !== "web" && currentEpisode?.url?.includes(".m3u8");
 
   // 移动端：下载 m3u8 → 过滤广告 → 写入缓存 → 设置 filteredUri
-  // 过滤完成前保持 loading，完成后才渲染 PlayerView
+  // 带内存缓存，相同路径的剧集切换时跳过过滤
   useEffect(() => {
     // 清理上一集的缓存文件
     if (mobileFileRef.current) {
@@ -93,9 +120,28 @@ export function PlayerScreen() {
 
     const url = currentEpisode?.url;
     if (!url || !url.includes(".m3u8") || Platform.OS === "web") {
-      // 非 m3u8 或 Web 端：无需过滤，直接可用
       setFilteredUri(url || null);
       setFiltering(false);
+      return;
+    }
+
+    // 检查内存缓存
+    const cached = getCachedFilter(url);
+    if (cached) {
+      const uid = Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+      const filePath = `${cacheDirectory}hls_filtered_${uid}.m3u8`;
+      (async () => {
+        try {
+          await writeAsStringAsync(filePath, cached);
+          mobileFileRef.current = filePath;
+          setFilteredUri(filePath);
+          setFiltering(false);
+        } catch {
+          // 写入失败回退原始 URL
+          setFilteredUri(url);
+          setFiltering(false);
+        }
+      })();
       return;
     }
 
@@ -122,6 +168,9 @@ export function PlayerScreen() {
           return;
         }
 
+        // 写入内存缓存
+        setCachedFilter(url, cleanText);
+
         const uid = Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
         const filePath = `${cacheDirectory}hls_filtered_${uid}.m3u8`;
         await writeAsStringAsync(filePath, cleanText);
@@ -137,7 +186,6 @@ export function PlayerScreen() {
       } catch (e) {
         if (cancelled) return;
         showToast("m3u8 过滤失败: " + e.message);
-        // 过滤失败则回退原始 URL
         setFilteredUri(url);
         setFiltering(false);
       }
@@ -148,18 +196,21 @@ export function PlayerScreen() {
     };
   }, [currentEpisode?.url, mobileRetryKey]);
 
-  // 定期保存播放进度
+
+  // 定期保存播放进度（带脏检查：时间变化超过阈值才写入）
   useEffect(() => {
     if (!currentEpisode?.url || !currentDetail?.id || !currentDetail?.sourceKey) return;
 
     const interval = setInterval(() => {
       const time = isHlsOnWeb ? hlsTimeRef.current : mobileTimeRef.current;
-      if (time > 0) {
+      if (time > 0 && Math.abs(time - lastSavedTimeRef.current) >= PROGRESS_SAVE_THRESHOLD) {
+        lastSavedTimeRef.current = time;
         updateProgress(currentDetail.id, currentDetail.sourceKey, {
           currentTime: time,
           episodeIndex: currentEpisodeIndex,
           lineIndex: currentLineIndex,
-          episodeUrl: currentEpisode?.url || ""
+          episodeUrl: currentEpisode?.url || "",
+          episodeTitle: currentEpisode?.title || ""
         });
       }
     }, PROGRESS_SAVE_INTERVAL);
@@ -194,9 +245,15 @@ export function PlayerScreen() {
           currentTime: time,
           episodeIndex: currentEpisodeIndex,
           lineIndex: currentLineIndex,
-          episodeUrl: currentEpisode?.url || ""
+          episodeUrl: currentEpisode?.url || "",
+          episodeTitle: currentEpisode?.title || ""
         });
       }
+    }
+    // 清理移动端过滤缓存
+    if (mobileFileRef.current) {
+      try { deleteAsync(mobileFileRef.current); } catch {}
+      mobileFileRef.current = null;
     }
     closePlayer();
     navigation.goBack();

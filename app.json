@@ -1,47 +1,47 @@
 ﻿{
-    "expo":  {
-                 "name":  "CV",
-                 "slug":  "libretv-mobile",
-                 "version":  "0.1.0",
-                 "orientation":  "portrait",
-                 "userInterfaceStyle":  "dark",
-                 "assetBundlePatterns":  [
-                                             "**/*"
-                                         ],
-                 "ios":  {
-                             "supportsTablet":  true,
-                             "infoPlist":  {
-                                               "NSAppTransportSecurity":  {
-                                                                              "NSAllowsArbitraryLoads":  true
-                                                                          },
-                                               "ITSAppUsesNonExemptEncryption":  false
-                                           },
-                             "bundleIdentifier":  "com.anonymous.cv"
-                         },
-                 "android":  {
-                                 "adaptiveIcon":  {
-                                                      "backgroundColor":  "#050505"
-                                                  },
-                                 "package":  "com.anonymous.cv",
-                                 "versionCode":  1
-                             },
-                 "extra":  {
-                               "eas":  {
-                                           "projectId":  "9afc627f-d09c-4dbd-b624-5aff9b65ca1d"
-                                       }
-                           },
-                 "plugins":  [
-                                 "expo-video",
-                                 [
-                                     "expo-build-properties",
-                                     {
-                                         "android":  {
-                                                         "usesCleartextTraffic":  true,
-                                                         "enableProguardInReleaseBuilds": true,
-                                                         "enableShrinkResourcesInReleaseBuilds": true
-                                                     }
-                                     }
-                                 ]
-                             ]
-             }
+  "expo": {
+    "name": "CV",
+    "slug": "libretv-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.anonymous.cv"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#050505"
+      },
+      "package": "com.anonymous.cv",
+      "versionCode": 1
+    },
+    "extra": {
+      "eas": {
+        "projectId": "9afc627f-d09c-4dbd-b624-5aff9b65ca1d"
+      }
+    },
+    "plugins": [
+      "expo-video",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true,
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ]
+    ]
+  }
 }

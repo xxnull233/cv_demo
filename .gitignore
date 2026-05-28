@@ -4,5 +4,7 @@ node_modules/
 expo.log
 expo.err.log
 npm-debug.log*
-.idea/
-.codegraph/
+
+
+.idea/
+.codegraph/

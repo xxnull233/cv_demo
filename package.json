@@ -11,7 +11,12 @@
     "web": "node scripts/start-web.js",
     "web:direct": "expo start --web",
     "build:android": "eas build -p android --profile preview --clear-cache",
-    "check": "node scripts/check.js && node scripts/parser-check.js"
+    "check": "node scripts/check.js && node scripts/parser-check.js",
+    "cg:status": "npx -p @colbymchenry/codegraph codegraph status",
+    "cg:sync": "npx -p @colbymchenry/codegraph codegraph sync",
+    "cg:search": "npx -p @colbymchenry/codegraph codegraph search",
+    "cg:explore": "npx -p @colbymchenry/codegraph codegraph explore",
+    "cg:context": "npx -p @colbymchenry/codegraph codegraph context"
   },
   "dependencies": {
     "@expo/metro-runtime": "~5.0.5",

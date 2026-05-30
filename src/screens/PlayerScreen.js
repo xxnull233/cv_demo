@@ -2,14 +2,13 @@
 import {
   ActivityIndicator,
   Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
+  Pressable,  ScrollView,
   Text,
   ToastAndroid,
   useWindowDimensions,
   View
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 
@@ -134,7 +133,7 @@ export function PlayerScreen() {
         try {
           await writeAsStringAsync(filePath, cached);
           mobileFileRef.current = filePath;
-          setFilteredUri(filePath);
+          setFilteredUri(Platform.OS === "ios" ? "file://" + filePath : filePath);
           setFiltering(false);
         } catch {
           // 写入失败回退原始 URL
@@ -181,7 +180,7 @@ export function PlayerScreen() {
         }
 
         mobileFileRef.current = filePath;
-        setFilteredUri(filePath);
+        setFilteredUri(Platform.OS === "ios" ? "file://" + filePath : filePath);
         setFiltering(false);
       } catch (e) {
         if (cancelled) return;

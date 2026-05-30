@@ -1,15 +1,15 @@
-﻿import { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Text,
   TextInput,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 

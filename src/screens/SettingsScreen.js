@@ -1,15 +1,17 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   ActivityIndicator,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  View
+  ToastAndroid,
+  View,
+  Platform
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import * as Clipboard from "expo-clipboard";
@@ -56,6 +58,12 @@ export function SettingsScreen() {
       setDeleteTarget(null);
     };
   }, []);
+
+  function showToast(msg) {
+    if (Platform.OS === "android") {
+      ToastAndroid.show(msg, ToastAndroid.SHORT);
+    }
+  }
 
   function startAdd() {
     setEditingKey("");
@@ -108,11 +116,11 @@ export function SettingsScreen() {
     setImporting(true);
     try {
       var count = await importFromUrl(url);
-      alert("成功导入 " + count + " 个源");
+      showToast("成功导入 " + count + " 个源");
       setImportUrl("");
       setShowImportUrl(false);
     } catch (e) {
-      alert("导入失败: " + e.message);
+      showToast("导入失败: " + e.message);
     } finally {
       setImporting(false);
     }
@@ -123,11 +131,11 @@ export function SettingsScreen() {
     if (!json) return;
     try {
       var count = await importFromJson(json);
-      alert("成功导入 " + count + " 个源");
+      showToast("成功导入 " + count + " 个源");
       setImportJson("");
       setShowImportJson(false);
     } catch (e) {
-      alert("导入失败: " + e.message);
+      showToast("导入失败: " + e.message);
     }
   }
 
@@ -140,6 +148,8 @@ export function SettingsScreen() {
     setFormVisible(false);
     setShowImportUrl(false);
     setShowImportJson(false);
+    setShowExport(false);
+    setExportJson("");
     setDeleteTarget(null);
     setEditingKey("");
     setForm(EMPTY_FORM);
@@ -277,7 +287,10 @@ export function SettingsScreen() {
                   </Pressable>
                   <Pressable style={styles.panelConfirmBtn} onPress={handleImportUrl} disabled={importing}>
                     {importing ? (
-                      <ActivityIndicator size="small" color="#fff" />
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <ActivityIndicator size="small" color="#050505" />
+                        <Text style={styles.panelConfirmText}>导入中...</Text>
+                      </View>
                     ) : (
                       <Text style={styles.panelConfirmText}>导入</Text>
                     )}
@@ -293,7 +306,7 @@ export function SettingsScreen() {
                   value={exportJson}
                   editable={false}
                   multiline
-                  style={[styles.formInput, { minHeight: 120 }]}
+                  style={[styles.formInput, { minHeight: 120 }]} scrollEnabled
                 />
                 <View style={styles.panelActions}>
                   <Pressable style={styles.panelCancelBtn} onPress={closeModal}>
@@ -303,7 +316,7 @@ export function SettingsScreen() {
                     style={styles.panelConfirmBtn}
                     onPress={async function () {
                       await Clipboard.setStringAsync(exportJson);
-                      alert("已复制到剪贴板");
+                      showToast("已复制到剪贴板");
                     }}
                   >
                     <Text style={styles.panelConfirmText}>复制</Text>
@@ -323,7 +336,7 @@ export function SettingsScreen() {
                   autoCapitalize="none"
                   autoFocus
                   multiline
-                  style={[styles.formInput, { minHeight: 100 }]}
+                  style={[styles.formInput, { minHeight: 100 }]} scrollEnabled
                 />
                 <View style={styles.panelActions}>
                   <Pressable style={styles.panelCancelBtn} onPress={closeModal}>
@@ -444,15 +457,16 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: "#171717",
     borderRadius: 14,
-    padding: 20,
+    padding: 16,
     borderWidth: 1,
-    borderColor: "#2a2a2a"
+    borderColor: "#2a2a2a",
+    maxHeight: "80%"
   },
   modalTitle: {
     color: "#f8fafc",
     fontSize: 17,
     fontWeight: "700",
-    marginBottom: 16,
+    marginBottom: 12,
     textAlign: "center"
   },
   sourceRow: {
@@ -537,20 +551,20 @@ const styles = StyleSheet.create({
     marginTop: 8
   },
   formInput: {
-    minHeight: 46,
+    minHeight: 42,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#2a2a2a",
     backgroundColor: "#111",
     color: "#f8fafc",
     paddingHorizontal: 14,
-    marginBottom: 10,
+    marginBottom: 8,
     fontSize: 14
   },
   panelActions: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 4
+    marginTop: 2
   },
   panelCancelBtn: {
     flex: 1,

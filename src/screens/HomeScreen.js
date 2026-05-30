@@ -4,11 +4,11 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
-  SafeAreaView,
   Text,
   TextInput,
   View
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ResultCard } from "../components/ResultCard";
 import { APP_NAME } from "../constants/app";

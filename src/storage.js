@@ -1,10 +1,10 @@
 ﻿import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const ALL_SOURCES_KEY = "libretv.mobile.allSources";
-const HISTORY_KEY = "libretv.mobile.history";
+const ALL_SOURCES_KEY = "cv.mobile.allSources";
+const HISTORY_KEY = "cv.mobile.history";
 
 export async function loadAllSources() {
-  const raw = await AsyncStorage.getItem("libretv.mobile.allSources");
+  const raw = await AsyncStorage.getItem("cv.mobile.allSources");
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -14,7 +14,7 @@ export async function loadAllSources() {
 
 export async function saveAllSources(sources) {
   const valid = Array.isArray(sources) ? sources.filter(s => s && s.name && s.api) : [];
-  await AsyncStorage.setItem("libretv.mobile.allSources", JSON.stringify(valid));
+  await AsyncStorage.setItem("cv.mobile.allSources", JSON.stringify(valid));
 }
 
 export function importSourcesFromJson(jsonString, existingSources) {
@@ -55,8 +55,8 @@ export function exportSources(sources) {
 }
 
 export async function migrateOldSources() {
-  const r1 = await AsyncStorage.getItem("libretv.mobile.selectedSources");
-  const r2 = await AsyncStorage.getItem("libretv.mobile.customSources");
+  const r1 = await AsyncStorage.getItem("cv.mobile.selectedSources");
+  const r2 = await AsyncStorage.getItem("cv.mobile.customSources");
   if (!r1 && !r2) return;
   const existing = await loadAllSources();
   if (existing.length > 0) return;
@@ -67,8 +67,8 @@ export async function migrateOldSources() {
       await saveAllSources(migrated);
     }
   } catch(e) {}
-  await AsyncStorage.removeItem("libretv.mobile.selectedSources");
-  await AsyncStorage.removeItem("libretv.mobile.customSources");
+  await AsyncStorage.removeItem("cv.mobile.selectedSources");
+  await AsyncStorage.removeItem("cv.mobile.customSources");
 }
 export async function loadHistory() {
   const raw = await AsyncStorage.getItem(HISTORY_KEY);
@@ -111,8 +111,8 @@ export async function updateHistoryProgress(id, sourceKey, progress) {
   await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
   return next;
 }
-const FAVORITES_KEY = "libretv.mobile.favorites";
-const LAST_FAVORITE_FOLDER_KEY = "libretv.mobile.lastFavoriteFolder";
+const FAVORITES_KEY = "cv.mobile.favorites";
+const LAST_FAVORITE_FOLDER_KEY = "cv.mobile.lastFavoriteFolder";
 const DEFAULT_FAVORITES = {
   folders: [
     {

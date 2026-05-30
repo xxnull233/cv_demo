@@ -1,4 +1,4 @@
-# CV Mobile
+﻿# CV Mobile
 
 参考libretv编写的Expo 移动端应用（iOS / Android / Web），直连 CMS10 采集站 API，不依赖后端代理层。
 
@@ -131,7 +131,3 @@ mobile/
     ├── check.js           # Babel 编译检查
     └── parser-check.js    # 播放地址解析检查
 ```
-
-## 内置资源站
-
-见 `src/api/sites.js`，包含如意、森林、天涯、暴风、电影天堂、非凡影视、豆瓣资源、爱乐资源、无尽资源、百度资源等 CMS 源。可通过设置页添加自定义源。

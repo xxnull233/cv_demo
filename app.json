@@ -40,7 +40,8 @@
             "enableProguardInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
             "compileSdkVersion": 36,
-            "targetSdkVersion": 36
+            "targetSdkVersion": 36,
+            "extraProguardRules": "# Keep all expo.modules.kotlin types (needed for reflection-based module definition)\n-keep class expo.modules.kotlin.** { *; }"
           }
         }
       ]

@@ -1,0 +1,93 @@
+name: iOS Build (unsigned IPA)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build iOS App (unsigned)
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read app version
+        id: app_version
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          echo "version=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "App version: v$VERSION"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuild native project (Expo)
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Install CocoaPods
+        run: pod install --project-directory=ios
+
+      - name: Build unsigned release .app
+        run: |
+          cd ios
+          xcodebuild -workspace libretv-mobile.xcworkspace \
+            -scheme libretv-mobile \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath ./build \
+            build \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -r ios/build/Build/Products/Release-iphoneos/libretv-mobile.app Payload/
+          zip -r unsigned.ipa Payload/
+          rm -rf Payload
+
+      - name: Rename IPA to custom format
+        run: |
+          APP_NAME="CV"
+          APP_VER=$(node -p "require('./app.json').expo.version")
+          DATE_TAG=$(date +%y%m%d%H%M)
+          new_name="${APP_NAME}-ios-v${APP_VER}-${DATE_TAG}.ipa"
+          mv unsigned.ipa "$new_name"
+          echo "Renamed: unsigned.ipa -> $new_name"
+
+      - name: Upload IPA (Actions Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-ipa-unsigned
+          path: ./*.ipa
+          if-no-files-found: error
+
+      - name: Delete existing release & tag (if any)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.app_version.outputs.version }}"
+          gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.app_version.outputs.version }}
+          name: ${{ steps.app_version.outputs.version }}
+          body: |
+            ## CV Mobile ${{ steps.app_version.outputs.version }} (iOS)
+
+            Commit: ${{ github.sha }}
+          files: ./*.ipa
+          draft: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

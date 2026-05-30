@@ -82,6 +82,20 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.EXPO_KEY_PASSWORD }}
 
+      - name: Rename APKs to custom format
+        run: |
+          APP_NAME="CV"
+          APP_VER=$(node -p "require('./app.json').expo.version")
+          DATE_TAG=$(date +%y%m%d%H%M)
+          cd android/app/build/outputs/apk/release
+          for apk in *.apk; do
+            # Extract ABI from filename: app-arm64-v8a-release.apk -> arm64-v8a
+            abi=$(echo "$apk" | sed 's/^app-//;s/-release.apk$//')
+            new_name="${APP_NAME}-${abi}-v${APP_VER}-${DATE_TAG}.apk"
+            mv "$apk" "$new_name"
+            echo "Renamed: $apk -> $new_name"
+          done
+
       - name: Upload APK (Actions Artifact)
         uses: actions/upload-artifact@v4
         with:

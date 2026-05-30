@@ -43,6 +43,20 @@ jobs:
           echo "${{ secrets.ANDROID_KEYS_BASE64 }}" | base64 -d > "$HOME/keys/keystore.jks"
           echo "ANDROID_KEYSTORE_PATH=$HOME/keys/keystore.jks" >> "$GITHUB_ENV"
 
+      - name: Upgrade CMake for NDK 27 compatibility
+        run: |
+          # NDK 27 requires CMake 3.22.1+; default GitHub runner has 3.22.1
+          # but NDK 27 + new architecture has known issues with CMake 3.22.
+          # Install a newer CMake version for better compatibility.
+          CMAKE_DIR=/usr/local/lib/android/sdk/cmake
+          CMAKE_VER=3.31.6
+          wget -q "https://github.com/Kitware/CMake/releases/download/v$CMAKE_VER/cmake-$CMAKE_VER-linux-x86_64.tar.gz" -O /tmp/cmake.tar.gz
+          mkdir -p "$CMAKE_DIR/$CMAKE_VER"
+          tar --strip=1 -xzf /tmp/cmake.tar.gz -C "$CMAKE_DIR/$CMAKE_VER"
+          rm /tmp/cmake.tar.gz
+          # Report installed version
+          $CMAKE_DIR/$CMAKE_VER/bin/cmake --version | head -1
+
       - name: Prebuild native project (Expo)
         run: npx expo prebuild --platform android --clean
 

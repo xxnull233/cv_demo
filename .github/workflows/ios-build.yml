@@ -39,19 +39,26 @@ jobs:
 
       - name: Build unsigned release .app
         run: |
+          # Auto-detect workspace and scheme names from generated ios project
           cd ios
-          xcodebuild -workspace libretv-mobile.xcworkspace \
-            -scheme libretv-mobile \
+          WORKSPACE=$(ls *.xcworkspace | head -1)
+          SCHEME="${WORKSPACE%.xcworkspace}"
+          echo "Detected workspace: $WORKSPACE"
+          echo "Detected scheme: $SCHEME"
+          xcodebuild -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath ./build \
             build \
             CODE_SIGNING_ALLOWED=NO
+          # Export the scheme name for later steps
+          echo "SCHEME=$SCHEME" >> "$GITHUB_ENV"
 
       - name: Package unsigned IPA
         run: |
           mkdir -p Payload
-          cp -r ios/build/Build/Products/Release-iphoneos/libretv-mobile.app Payload/
+          cp -r "ios/build/Build/Products/Release-iphoneos/${SCHEME}.app" Payload/
           zip -r unsigned.ipa Payload/
           rm -rf Payload
 

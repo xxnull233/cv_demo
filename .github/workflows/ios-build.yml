@@ -41,7 +41,7 @@ jobs:
         run: |
           # Auto-detect workspace and scheme names from generated ios project
           cd ios
-          WORKSPACE=$(ls *.xcworkspace | head -1)
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
           SCHEME="${WORKSPACE%.xcworkspace}"
           echo "Detected workspace: $WORKSPACE"
           echo "Detected scheme: $SCHEME"

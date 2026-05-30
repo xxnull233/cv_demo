@@ -52,23 +52,25 @@ jobs:
           sed -i "s/classpath('com.android.tools.build:gradle')/classpath('com.android.tools.build:gradle:8.9.1')/" android/build.gradle
 
           # Add ABI splits to generate per-architecture APKs (smaller download size)
-          node -e "
+          # Write node script to temp file to avoid bash quoting issues
+          cat > /tmp/add-splits.js << 'NODESCRIPT'
             const fs = require('fs');
             let c = fs.readFileSync('android/app/build.gradle', 'utf8');
             const splitBlock = [
               '    splits {',
               '        abi {',
               '            enable true',
-              "            reset()",
+              '            reset()',
               "            include 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'",
               '            universalApk false',
               '        }',
               '    }',
               ''
             ].join('\n');
-            c = c.replace(\"namespace 'com.anonymous.cv'\", \"namespace 'com.anonymous.cv'\n\" + splitBlock);
+            c = c.replace("namespace 'com.anonymous.cv'", "namespace 'com.anonymous.cv'\n" + splitBlock);
             fs.writeFileSync('android/app/build.gradle', c);
-          "
+          NODESCRIPT
+          node /tmp/add-splits.js
 
       - name: Build signed release APKs (per-ABI)
         run: |

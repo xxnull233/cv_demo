@@ -1,4 +1,4 @@
-﻿{
+{
   "expo": {
     "name": "CV",
     "slug": "libretv-mobile",
@@ -38,7 +38,9 @@
           "android": {
             "usesCleartextTraffic": true,
             "enableProguardInReleaseBuilds": true,
-            "enableShrinkResourcesInReleaseBuilds": true
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36
           }
         }
       ]

@@ -2,7 +2,8 @@
 import {
   ActivityIndicator,
   Platform,
-  Pressable,  ScrollView,
+  Pressable,
+  ScrollView,
   Text,
   ToastAndroid,
   useWindowDimensions,
@@ -26,6 +27,7 @@ import { PlayerView } from "../components/PlayerView";
 import { cacheDirectory, writeAsStringAsync, deleteAsync } from "expo-file-system";
 import { filterM3u8ByUrl } from "../utils/m3u8Filter";
 import { PROXY_BASE } from "../constants/app";
+import { convertUrl } from "expo-video-cache";
 
 const styles = { ...sharedStyles, ...playerStyles };
 const PROGRESS_SAVE_INTERVAL = 3000;
@@ -133,7 +135,7 @@ export function PlayerScreen() {
         try {
           await writeAsStringAsync(filePath, cached);
           mobileFileRef.current = filePath;
-          setFilteredUri(Platform.OS === "ios" ? "file://" + filePath : filePath);
+          setFilteredUri(Platform.OS === "ios" ? convertUrl("file://" + filePath) : filePath);
           setFiltering(false);
         } catch {
           // 写入失败回退原始 URL
@@ -180,7 +182,7 @@ export function PlayerScreen() {
         }
 
         mobileFileRef.current = filePath;
-        setFilteredUri(Platform.OS === "ios" ? "file://" + filePath : filePath);
+        setFilteredUri(Platform.OS === "ios" ? convertUrl("file://" + filePath) : filePath);
         setFiltering(false);
       } catch (e) {
         if (cancelled) return;
@@ -311,7 +313,7 @@ export function PlayerScreen() {
           </View>
         ) : (
           <PlayerView
-            key={`mobile-${mobileRetryKey}`}
+            key={`mobile-${mobileRetryKey}-${currentEpisode?.url || index}`}
             uri={filteredUri}
             style={styles.video}
             initialTime={savedPlaybackTime.current}

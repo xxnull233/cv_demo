@@ -32,6 +32,7 @@
     "expo-screen-orientation": "~8.1.7",
     "expo-status-bar": "~2.2.3",
     "expo-video": "~2.2.2",
+    "expo-video-cache": "^2.1.0",
     "hls.js": "^1.6.16",
     "react": "19.0.0",
     "react-dom": "19.0.0",

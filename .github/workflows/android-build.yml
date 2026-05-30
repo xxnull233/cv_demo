@@ -1,4 +1,4 @@
-name: Mobile Build (APK)
+name: Android Build (APK)
 
 on:
   workflow_dispatch:
@@ -61,7 +61,7 @@ jobs:
               '        abi {',
               '            enable true',
               '            reset()',
-              "            include 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'",
+              "            include 'arm64-v8a', 'armeabi-v7a', 'x86_64'",
               '            universalApk false',
               '        }',
               '    }',

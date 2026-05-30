@@ -150,6 +150,8 @@ export function SettingsScreen() {
     setShowImportJson(false);
     setShowExport(false);
     setExportJson("");
+    setImportUrl("");
+    setImportJson("");
     setDeleteTarget(null);
     setEditingKey("");
     setForm(EMPTY_FORM);
@@ -306,7 +308,7 @@ export function SettingsScreen() {
                   value={exportJson}
                   editable={false}
                   multiline
-                  style={[styles.formInput, { minHeight: 120 }]} scrollEnabled
+                  style={[styles.formInput, { minHeight: 120, maxHeight: 200 }]} scrollEnabled
                 />
                 <View style={styles.panelActions}>
                   <Pressable style={styles.panelCancelBtn} onPress={closeModal}>
@@ -336,7 +338,7 @@ export function SettingsScreen() {
                   autoCapitalize="none"
                   autoFocus
                   multiline
-                  style={[styles.formInput, { minHeight: 100 }]} scrollEnabled
+                  style={[styles.formInput, { minHeight: 100, maxHeight: 200 }]} scrollEnabled
                 />
                 <View style={styles.panelActions}>
                   <Pressable style={styles.panelCancelBtn} onPress={closeModal}>

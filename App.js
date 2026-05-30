@@ -9,6 +9,7 @@ import { AppProviders } from "./src/context/AppProviders";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { startServer } from "expo-video-cache";
 
 // App 启动时清理残留的 hls 过滤缓存文件（防止闪退/强杀后残留）
 async function cleanupHlsCache() {
@@ -26,7 +27,10 @@ async function cleanupHlsCache() {
 }
 
 export default function App() {
-  useEffect(() => { cleanupHlsCache(); }, []);
+  useEffect(() => {
+    cleanupHlsCache();
+    if (Platform.OS === "ios") { startServer().catch(() => {}); }
+  }, []);
 
   return (
     <SafeAreaProvider>
@@ -38,3 +42,4 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+

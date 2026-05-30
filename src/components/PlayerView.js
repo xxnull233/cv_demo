@@ -1,4 +1,4 @@
-﻿import { useEvent } from "expo";
+import { useEvent } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useRef } from "react";
 
@@ -23,6 +23,17 @@ export function PlayerView({
     player.play();
   });
   const firstFrameDone = useRef(false);
+
+  // 源变化时切换到新地址
+  useEffect(() => {
+    if (uri) {
+      player.replace(uri);
+      if (initialTime > 0) {
+        player.currentTime = initialTime;
+      }
+      player.play();
+    }
+  }, [uri, player]);
 
   // 启用 timeupdate 事件
   useEffect(() => {

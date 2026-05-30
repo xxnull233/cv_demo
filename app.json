@@ -1,8 +1,8 @@
-{
+﻿{
   "expo": {
     "name": "CV",
     "slug": "libretv-mobile",
-  "icon": "./assets/icon.png",
+    "icon": "./assets/icon.png",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
@@ -10,7 +10,7 @@
       "**/*"
     ],
     "ios": {
-    "icon": "./assets/icon.png",
+      "icon": "./assets/icon.png",
       "supportsTablet": true,
       "infoPlist": {
         "NSAppTransportSecurity": {
@@ -22,7 +22,7 @@
     },
     "android": {
       "adaptiveIcon": {
-      "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#050505"
       },
       "package": "com.anonymous.cv",

@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    name: Build Android APK (Split by ABI)
+    name: Build Android APK (Universal)
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -43,7 +43,10 @@ jobs:
           echo "${{ secrets.ANDROID_KEYS_BASE64 }}" | base64 -d > "$HOME/keys/keystore.jks"
           echo "ANDROID_KEYSTORE_PATH=$HOME/keys/keystore.jks" >> "$GITHUB_ENV"
 
-      - name: Build signed release APKs (split by ABI)
+      - name: Prebuild native project (Expo)
+        run: npx expo prebuild --platform android --clean
+
+      - name: Build signed release APK
         run: |
           chmod +x ./gradlew
           ./gradlew assembleRelease
@@ -53,10 +56,10 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.EXPO_KEY_PASSWORD }}
 
-      - name: Upload APKs (Actions Artifact)
+      - name: Upload APK (Actions Artifact)
         uses: actions/upload-artifact@v4
         with:
-          name: app-apks
+          name: app-apk
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 

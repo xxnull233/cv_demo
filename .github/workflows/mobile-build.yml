@@ -46,6 +46,12 @@ jobs:
       - name: Prebuild native project (Expo)
         run: npx expo prebuild --platform android --clean
 
+      - name: Override AGP version for Expo SDK 53 compatibility
+        run: |
+          # Expo SDK 53 modules (androidx.core:core-ktx:1.17.0) require AGP >= 8.9.1
+          # RN 0.79.6 defaults to AGP 8.8.2; override after prebuild
+          sed -i "s/classpath('com.android.tools.build:gradle')/classpath('com.android.tools.build:gradle:8.9.1')/" android/build.gradle
+
       - name: Build signed release APK
         run: |
           chmod +x ./gradlew

@@ -1,11 +1,11 @@
 ﻿import { StatusBar as ExpoStatusBar } from "expo-status-bar";
+import Toast from "react-native-toast-message";
 import {
   ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
   Text,
-  ToastAndroid,
   useWindowDimensions,
   View
 } from "react-native";
@@ -27,7 +27,17 @@ import { PlayerView } from "../components/PlayerView";
 import { cacheDirectory, writeAsStringAsync, deleteAsync } from "expo-file-system";
 import { filterM3u8ByUrl } from "../utils/m3u8Filter";
 import { PROXY_BASE } from "../constants/app";
-import { convertUrl } from "expo-video-cache";
+
+// iOS 视频缓存路径转换（需 expo-video-cache 服务）
+// 失败时会向外抛出异常，由调用方的 try/catch 回退到原始网络 URL
+let _convertUrl = null;
+async function getConvertedUrl(filePath) {
+  if (_convertUrl === null) {
+    const mod = await import("expo-video-cache");
+    _convertUrl = mod.convertUrl;
+  }
+  return _convertUrl("file://" + filePath);
+}
 
 const styles = { ...sharedStyles, ...playerStyles };
 const PROGRESS_SAVE_INTERVAL = 3000;
@@ -68,12 +78,8 @@ function getPlayerUrl(url) {
   return url;
 }
 
-function showToast(msg) {
-  if (Platform.OS === "android") {
-    ToastAndroid.show(msg, ToastAndroid.SHORT);
-  } else {
-    console.warn(msg);
-  }
+function showToast(msg, type) {
+  Toast.show({ type: type || "error", text1: msg, position: "bottom", visibilityTime: 3000 });
 }
 
 export function PlayerScreen() {
@@ -135,7 +141,7 @@ export function PlayerScreen() {
         try {
           await writeAsStringAsync(filePath, cached);
           mobileFileRef.current = filePath;
-          setFilteredUri(Platform.OS === "ios" ? convertUrl("file://" + filePath) : filePath);
+          setFilteredUri(Platform.OS === "ios" ? await getConvertedUrl(filePath) : filePath);
           setFiltering(false);
         } catch {
           // 写入失败回退原始 URL
@@ -163,7 +169,7 @@ export function PlayerScreen() {
         if (cancelled) return;
 
         if (!cleanText) {
-          showToast("过滤后 m3u8 为空，回退原始 URL");
+          showToast("过滤后 m3u8 为空，已回退原始 URL", "info");
           setFilteredUri(url);
           setFiltering(false);
           return;
@@ -182,11 +188,11 @@ export function PlayerScreen() {
         }
 
         mobileFileRef.current = filePath;
-        setFilteredUri(Platform.OS === "ios" ? convertUrl("file://" + filePath) : filePath);
+        setFilteredUri(Platform.OS === "ios" ? await getConvertedUrl(filePath) : filePath);
         setFiltering(false);
       } catch (e) {
         if (cancelled) return;
-        showToast("m3u8 过滤失败: " + e.message);
+        showToast("m3u8 过滤失败: " + e.message, "error");
         setFilteredUri(url);
         setFiltering(false);
       }

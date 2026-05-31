@@ -18,8 +18,6 @@ import { useFavorites } from "../context/FavoritesContext";
 import { useSources } from "../context/SourceContext";
 import { useOpenResult } from "../hooks/useOpenResult";
 
-const CATEGORY_BAR_HEIGHT = 36;
-
 export function CategoryScreen() {
   const navigation = useNavigation();
   const { sourceEntries } = useSources();
@@ -143,11 +141,8 @@ export function CategoryScreen() {
   function renderCategoryTab(cat) {
     const isActive = cat.id === activeCategoryId;
     return (
-      <Pressable key={cat.id} style={[{
-        paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8,
-        backgroundColor: isActive ? "#f8fafc" : "#1a1a1a"
-      }]} onPress={function() { handleCategoryPress(cat.id); }}>
-        <Text style={{ color: isActive ? "#050505" : "#a0a0a0", fontSize: 14, fontWeight: isActive ? "700" : "500" }}>
+      <Pressable key={cat.id} style={[styles.categoryTab, isActive ? styles.categoryTabActive : styles.categoryTabInactive]} onPress={function() { handleCategoryPress(cat.id); }}>
+        <Text style={[styles.categoryTabText, isActive ? styles.categoryTabTextActive : styles.categoryTabTextInactive]}>
           {cat.name}
         </Text>
       </Pressable>
@@ -163,7 +158,7 @@ export function CategoryScreen() {
           <Pressable style={styles.ghostButton} onPress={() => navigation.goBack()}>
             <Text style={styles.ghostButtonText}>返回</Text>
           </Pressable>
-          <View style={{ flex: 1 }} />
+          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.centerState}>
           <Text style={styles.centerTitle}>暂无数据源</Text>
@@ -177,17 +172,14 @@ export function CategoryScreen() {
         <Pressable style={styles.ghostButton} onPress={() => navigation.goBack()}>
           <Text style={styles.ghostButtonText}>返回</Text>
         </Pressable>
-        <View style={{ flex: 1 }} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxWidth: 360, flexGrow: 1 }}>
+        <View style={styles.headerSpacer} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sourceTabScroll}>
           {sourceEntries.map(function(entry) {
             const key = entry[0];
             const isActive = key === siteKey;
             return (
-              <Pressable key={key} style={[{
-                paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginLeft: 6,
-                backgroundColor: isActive ? "#f8fafc" : "#1a1a1a"
-              }]} onPress={function() { setSiteKey(key); }}>
-                <Text style={{ color: isActive ? "#050505" : "#a0a0a0", fontSize: 12, fontWeight: isActive ? "700" : "500" }}>
+              <Pressable key={key} style={[styles.sourceTab, isActive ? styles.sourceTabActive : styles.sourceTabInactive]} onPress={function() { setSiteKey(key); }}>
+                <Text style={[styles.sourceTabText, isActive ? styles.sourceTabTextActive : styles.sourceTabTextInactive]}>
                   {entry[1].name}
                 </Text>
               </Pressable>
@@ -196,7 +188,7 @@ export function CategoryScreen() {
         </ScrollView>
       </View>
 
-      <View style={{ height: CATEGORY_BAR_HEIGHT, justifyContent: "center", marginLeft: 16, marginTop: 4, marginBottom: 2 }}>
+      <View style={styles.categoryBar}>
         {loadingCat ? (
           <ActivityIndicator color="#38bdf8" size="small" />
         ) : categories.length > 0 ? (
@@ -204,17 +196,17 @@ export function CategoryScreen() {
             {categories.map(renderCategoryTab)}
           </ScrollView>
         ) : loadCatError ? (
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Text style={{ color: "#ef4444", fontSize: 13 }}>{loadCatError}</Text>
-            <Pressable style={{ marginLeft: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: "#38bdf8" }} onPress={function() {
+          <View style={styles.errorRow}>
+            <Text style={styles.errorText}>{loadCatError}</Text>
+            <Pressable style={styles.retryBtn} onPress={function() {
               const entry = sourceEntriesRef.current.find(function(e) { return e[0] === siteKey; });
               if (entry) loadCategories(entry[1]);
             }}>
-              <Text style={{ color: "#38bdf8", fontSize: 12, fontWeight: "600" }}>重试</Text>
+              <Text style={styles.retryText}>重试</Text>
             </Pressable>
           </View>
         ) : (
-          <Text style={{ color: "#8a8a8a", fontSize: 13 }}>暂未获取到分类</Text>
+          <Text style={styles.emptyInfoText}>暂未获取到分类</Text>
         )}
       </View>
 
@@ -226,7 +218,7 @@ export function CategoryScreen() {
         )}
         keyExtractor={function(item) { return item.sourceKey + "-" + item.id; }}
         extraData={favorites}
-        contentContainerStyle={[styles.listContent, { paddingTop: 4 }]}
+        contentContainerStyle={styles.listContent}
         refreshing={refreshing}
         onRefresh={handleRefresh}
         onEndReached={handleLoadMore}
@@ -236,7 +228,7 @@ export function CategoryScreen() {
           loadingVideos ? (
             <View style={styles.centerState}>
               <ActivityIndicator color="#38bdf8" size="large" />
-              <Text style={{ color: "#8a8a8a", fontSize: 13, marginTop: 10 }}>加载中...</Text>
+              <Text style={styles.loadingText}>加载中...</Text>
             </View>
           ) : (
             <View style={styles.centerState}>
@@ -247,12 +239,12 @@ export function CategoryScreen() {
         }
         ListFooterComponent={
           loadingVideos && videos.length > 0 ? (
-            <View style={{ paddingVertical: 20, alignItems: "center" }}>
+            <View style={styles.footerLoader}>
               <ActivityIndicator color="#38bdf8" size="small" />
             </View>
           ) : !hasMore && videos.length > 0 ? (
-            <View style={{ paddingVertical: 16, alignItems: "center" }}>
-              <Text style={{ color: "#5f5f5f", fontSize: 12 }}>已全部加载</Text>
+            <View style={styles.footerEnd}>
+              <Text style={styles.footerEndText}>已全部加载</Text>
             </View>
           ) : null
         }

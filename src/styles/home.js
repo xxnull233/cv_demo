@@ -167,4 +167,15 @@ export const styles = StyleSheet.create({
 
   },
 
+  loadingText: {
+    color: "#8a8a8a",
+    fontSize: 13,
+    marginTop: 10
+  },
+
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: "center"
+  },
+
 });

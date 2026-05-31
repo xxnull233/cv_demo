@@ -98,7 +98,7 @@ export function HomeScreen() {
               loading ? (
                 <View style={styles.centerState}>
                   <ActivityIndicator color="#38bdf8" size="large" />
-                  <Text style={{ color: "#8a8a8a", fontSize: 13, marginTop: 10 }}>正在搜索...</Text>
+                  <Text style={styles.loadingText}>正在搜索...</Text>
                 </View>
               ) : searchError ? (
                 <View style={styles.centerState}>
@@ -113,7 +113,7 @@ export function HomeScreen() {
             }
             ListFooterComponent={
               loading && results.length > 0 ? (
-                <View style={{ paddingVertical: 20, alignItems: "center" }}>
+                <View style={styles.footerLoader}>
                   <ActivityIndicator color="#38bdf8" size="small" />
                 </View>
               ) : null

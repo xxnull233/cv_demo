@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Toast from "react-native-toast-message";
 import {
   ActivityIndicator,
   Modal,
@@ -7,9 +8,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  ToastAndroid,
-  View,
-  Platform
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -59,10 +58,8 @@ export function SettingsScreen() {
     };
   }, []);
 
-  function showToast(msg) {
-    if (Platform.OS === "android") {
-      ToastAndroid.show(msg, ToastAndroid.SHORT);
-    }
+  function showToast(msg, type) {
+    Toast.show({ type: type || "info", text1: msg, position: "bottom", visibilityTime: 3000 });
   }
 
   function startAdd() {
@@ -116,11 +113,11 @@ export function SettingsScreen() {
     setImporting(true);
     try {
       var count = await importFromUrl(url);
-      showToast("成功导入 " + count + " 个源");
+      showToast("成功导入 " + count + " 个源", "success");
       setImportUrl("");
       setShowImportUrl(false);
     } catch (e) {
-      showToast("导入失败: " + e.message);
+      showToast("导入失败: " + e.message, "error");
     } finally {
       setImporting(false);
     }
@@ -131,11 +128,11 @@ export function SettingsScreen() {
     if (!json) return;
     try {
       var count = await importFromJson(json);
-      showToast("成功导入 " + count + " 个源");
+      showToast("成功导入 " + count + " 个源", "success");
       setImportJson("");
       setShowImportJson(false);
     } catch (e) {
-      showToast("导入失败: " + e.message);
+      showToast("导入失败: " + e.message, "error");
     }
   }
 
@@ -318,7 +315,7 @@ export function SettingsScreen() {
                     style={styles.panelConfirmBtn}
                     onPress={async function () {
                       await Clipboard.setStringAsync(exportJson);
-                      showToast("已复制到剪贴板");
+                      showToast("已复制到剪贴板", "success");
                     }}
                   >
                     <Text style={styles.panelConfirmText}>复制</Text>

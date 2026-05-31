@@ -1,20 +1,28 @@
 import { useEvent } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useRef } from "react";
+import { View } from "react-native";
+
+import { PlayerControls } from "./PlayerControls";
 
 /**
  * 播放器子组件 — 仅在合法 URI 传入时才挂载
  *
  * 将 useVideoPlayer 封装在此组件内，确保播放器首次创建时
  * 永远收到有效源（不会以 null 初始化），避免空源导致的错误状态。
+ *
+ * 当 nativeControls={false} 时，显示 Bilibili 风格的自定义控制覆盖层。
  */
 export function PlayerView({
   uri,
   style,
+  nativeControls = true,
+  title,
+  onBack,
   onTimeUpdate,
   onFirstFrameRender,
   onError,
-  initialTime = 0
+  initialTime = 0,
 }) {
   const player = useVideoPlayer(uri, (player) => {
     if (initialTime > 0) {
@@ -52,7 +60,7 @@ export function PlayerView({
   // 监听播放器状态变化，错误时通知父组件
   const statusEvent = useEvent(player, "statusChange", {
     status: player.status,
-    oldStatus: player.status
+    oldStatus: player.status,
   });
   const playerStatus = statusEvent?.status || player.status;
 
@@ -70,12 +78,22 @@ export function PlayerView({
   }
 
   return (
-    <VideoView
-      player={player}
-      style={style}
-      nativeControls
-      contentFit="contain"
-      onFirstFrameRender={handleFirstFrameRender}
-    />
+    <View style={style}>
+      <VideoView
+        player={player}
+        style={{ flex: 1 }}
+        nativeControls={nativeControls}
+        contentFit="contain"
+        onFirstFrameRender={handleFirstFrameRender}
+      />
+      {!nativeControls && title !== undefined && (
+        <PlayerControls
+          player={player}
+          title={title}
+          onBack={onBack}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+        />
+      )}
+    </View>
   );
 }

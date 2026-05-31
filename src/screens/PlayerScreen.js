@@ -26,7 +26,9 @@ import { HlsVideo } from "../components/HlsVideo";
 import { PlayerView } from "../components/PlayerView";
 import { cacheDirectory, writeAsStringAsync, deleteAsync } from "expo-file-system";
 import { filterM3u8ByUrl } from "../utils/m3u8Filter";
+import { getDetectorForSource } from "../utils/m3u8Strategies";
 import { PROXY_BASE } from "../constants/app";
+import { useSources } from "../context/SourceContext";
 
 // iOS 视频缓存路径转换（需 expo-video-cache 服务）
 // 失败时会向外抛出异常，由调用方的 try/catch 回退到原始网络 URL
@@ -93,6 +95,7 @@ export function PlayerScreen() {
     setCurrentEpisodeIndex,
     selectLine
   } = usePlayer();
+  const { sourceMap } = useSources();
   const { updateProgress } = useHistory();
 
   const { width: windowWidth } = useWindowDimensions();
@@ -164,7 +167,10 @@ export function PlayerScreen() {
           throw new Error("cacheDirectory is null");
         }
 
-        const { text: cleanText } = await filterM3u8ByUrl(url);
+        const detector = currentDetail?.sourceKey
+          ? getDetectorForSource(sourceMap?.[currentDetail.sourceKey]?.adStrategy)
+          : null;
+        const { text: cleanText } = await filterM3u8ByUrl(url, detector);
 
         if (cancelled) return;
 
@@ -270,6 +276,22 @@ export function PlayerScreen() {
     return null;
   }
 
+  // Web 端视频上方浮层返回按钮样式
+  const webBackBtn = {
+    position: "absolute",
+    top: 8,
+    left: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  };
+  const webBackBtnText = {
+    color: "#f8fafc",
+    fontSize: 14,
+    fontWeight: "700",
+  };
+
   const episodeButtonWidth = useMemo(() => {
     const availableWidth = Math.max(
       0,
@@ -287,27 +309,23 @@ export function PlayerScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ExpoStatusBar style="light" backgroundColor="#050505" translucent={false} />
-      <View style={styles.playerHeader}>
-        <Pressable style={styles.ghostButton} onPress={handleBack}>
-          <Text style={styles.ghostButtonText}>{"返回"}</Text>
-        </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {currentDetail.title}
-        </Text>
-      </View>
-
       <View style={styles.videoWrapper}>
         {isHlsOnWeb ? (
-          <HlsVideo
-            key={hlsRetryKey}
-            uri={getPlayerUrl(currentEpisode?.url)}
-            style={styles.video}
-            contentFit="contain"
-            onError={setHlsError}
-            onTimeUpdate={(t) => { hlsTimeRef.current = t; }}
-            onFirstFrameRender={() => {}}
-            initialTime={savedPlaybackTime.current}
-          />
+          <View>
+            <HlsVideo
+              key={hlsRetryKey}
+              uri={getPlayerUrl(currentEpisode?.url)}
+              style={styles.video}
+              contentFit="contain"
+              onError={setHlsError}
+              onTimeUpdate={(t) => { hlsTimeRef.current = t; }}
+              onFirstFrameRender={() => {}}
+              initialTime={savedPlaybackTime.current}
+            />
+            <Pressable style={webBackBtn} onPress={handleBack}>
+              <Text style={webBackBtnText}>{"返回"}</Text>
+            </Pressable>
+          </View>
         ) : filtering ? (
           <View style={styles.video}>
             <View style={styles.playerOverlay}>
@@ -322,6 +340,9 @@ export function PlayerScreen() {
             key={`mobile-${mobileRetryKey}-${currentEpisode?.url || index}`}
             uri={filteredUri}
             style={styles.video}
+            nativeControls={false}
+            title={currentDetail?.title}
+            onBack={handleBack}
             initialTime={savedPlaybackTime.current}
             onTimeUpdate={(t) => { mobileTimeRef.current = t; }}
             onError={setMobileError}

@@ -1,9 +1,8 @@
 ﻿import { useEffect, useRef } from "react";
-import Hls from "hls.js";
 
 /**
  * Web 端 HLS 播放组件
- * Chrome/Firefox → hls.js；Safari → 原生 HLS
+ * Chrome/Firefox → hls.js（动态导入，移动端不打包）；Safari → 原生 HLS
  * Mobile 平台不使用此组件。
  */
 export function HlsVideo({
@@ -13,7 +12,7 @@ export function HlsVideo({
   onError,
   onTimeUpdate,
   onFirstFrameRender,
-  initialTime = 0
+  initialTime = 0,
 }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -26,42 +25,62 @@ export function HlsVideo({
     if (!video) return;
 
     let hls = null;
+    let destroyed = false;
 
-    if (Hls.isSupported()) {
-      // Chrome / Firefox / Edge — hls.js
-      hls = new Hls();
-      hlsRef.current = hls;
+    async function initHls() {
+      try {
+        const Hls = (await import("hls.js")).default;
+        if (destroyed) return;
 
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        hls.loadSource(uri);
-      });
+        if (Hls.isSupported()) {
+          hls = new Hls();
+          hlsRef.current = hls;
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        // 恢复播放进度
-        if (initialTime > 0) {
-          video.currentTime = initialTime;
+          hls.attachMedia(video);
+          hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+            hls.loadSource(uri);
+          });
+
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            if (initialTime > 0) {
+              video.currentTime = initialTime;
+            }
+            video.play();
+          });
+
+          hls.on(Hls.Events.ERROR, (_event, data) => {
+            if (data.fatal) {
+              onError?.(true);
+            }
+          });
+        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+          video.src = uri;
+          if (initialTime > 0) {
+            video.addEventListener(
+              "loadedmetadata",
+              () => {
+                video.currentTime = initialTime;
+                video.play();
+              },
+              { once: true }
+            );
+          } else {
+            video.play();
+          }
         }
-        video.play();
-      });
-
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) {
-          onError?.(true);
-        }
-      });
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      // Safari 原生 HLS
-      video.src = uri;
-      if (initialTime > 0) {
-        video.addEventListener("loadedmetadata", () => {
-          video.currentTime = initialTime;
+      } catch {
+        // hls.js 加载失败，尝试 Safari 原生 HLS
+        if (!destroyed && video.canPlayType("application/vnd.apple.mpegurl")) {
+          video.src = uri;
+          if (initialTime > 0) {
+            video.currentTime = initialTime;
+          }
           video.play();
-        }, { once: true });
-      } else {
-        video.play();
+        }
       }
     }
+
+    initHls();
 
     // ── 事件绑定 ──
 
@@ -81,11 +100,12 @@ export function HlsVideo({
 
     // ── 清理 ──
     return () => {
+      destroyed = true;
       video.removeEventListener("timeupdate", onTime);
       video.removeEventListener("loadeddata", onFirstFrame);
       video.removeEventListener("error", onVideoError);
-      if (hls) {
-        hls.destroy();
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
         hlsRef.current = null;
       } else {
         video.removeAttribute("src");

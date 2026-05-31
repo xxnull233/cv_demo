@@ -29,19 +29,20 @@ export function getPathDir(url) {
   }
 }
 
+// ─── 广告检测策略 ───────────────────────────────────
+
 /**
- * 广告段检测 — 两种策略
- * 策略 1：DISCONTINUITY 后路径切换 → DISCONTINUITY 前为广告
- * 策略 2：无 DISCONTINUITY，前几段路径与主体不同 → 前几段为广告
+ * 策略 1：DISCONTINUITY 路径差异
+ * 检测 #EXT-X-DISCONTINUITY 标记，对比前后 segments 路径目录。
+ * 若前段路径全异于后段 → 前段为广告。
  * @param {Array} segments - segment 数组，每项需含 { url, afterDiscontinuity }
  * @param {string} baseUrl - 用于解析相对路径
  * @returns {Set<number>} 广告段索引集合
  */
-export function detectAdSegments(segments, baseUrl) {
+export function detectByDiscontinuity(segments, baseUrl) {
   const adIndices = new Set();
   if (segments.length < 3) return adIndices;
 
-  // 策略 1：DISCONTINUITY + 路径差异
   const firstDiscIdx = segments.findIndex((s) => s.afterDiscontinuity);
   if (firstDiscIdx > 0) {
     const pre = segments.slice(0, firstDiscIdx);
@@ -50,22 +51,6 @@ export function detectAdSegments(segments, baseUrl) {
     const postPaths = [...new Set(post.map((s) => getPathDir(resolveUrl(baseUrl, s.url))))];
     if (prePaths.every((p) => !postPaths.includes(p)) && postPaths.length >= 1) {
       for (let i = 0; i < firstDiscIdx; i++) adIndices.add(i);
-      return adIndices;
-    }
-  }
-
-  // 策略 2：无 DISCONTINUITY，前几段路径不同
-  const paths = segments.map((s) => getPathDir(resolveUrl(baseUrl, s.url)));
-  const counts = {};
-  paths.forEach((p) => { counts[p] = (counts[p] || 0) + 1; });
-  const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
-  if (dominant) {
-    const firstDom = paths.indexOf(dominant);
-    if (firstDom > 0) {
-      const firstPaths = new Set(paths.slice(0, firstDom));
-      if ([...firstPaths].every((p) => p !== dominant) && firstPaths.size <= 2) {
-        for (let i = 0; i < firstDom; i++) adIndices.add(i);
-      }
     }
   }
 
@@ -73,9 +58,82 @@ export function detectAdSegments(segments, baseUrl) {
 }
 
 /**
+ * 策略 2：均匀时长检测
+ * 按 DISCONTINUITY 边界分组，若某组内有 ≥5 个 segment 时长 ≈ 4 秒，
+ * 则整个组判定为广告（常见于固定片头片尾广告）。
+ * @param {Array} segments - segment 数组
+ * @param {string} baseUrl - 用于解析相对路径（本策略未使用）
+ * @returns {Set<number>} 广告段索引集合
+ */
+export function detectByUniformDuration(segments, baseUrl) {
+  const adIndices = new Set();
+  if (segments.length < 3) return adIndices;
+
+  // 按 DISCONTINUITY 边界分组
+  let groupStart = 0;
+  for (let i = 0; i <= segments.length; i++) {
+    const isBoundary = i === segments.length || segments[i].afterDiscontinuity;
+    if (isBoundary) {
+      if (i > groupStart) {
+        const countMatch = (function () {
+          var n = 0;
+          for (var j = groupStart; j < i; j++) {
+            if (Math.abs(segments[j].duration - 4) < 0.01) n++;
+          }
+          return n;
+        })();
+        if (countMatch === 5) {
+          for (var j = groupStart; j < i; j++) adIndices.add(j);
+        }
+      }
+      groupStart = i;
+    }
+  }
+
+  return adIndices;
+}
+
+/**
+ * 默认组合策略（当前行为）
+ * 先试 DISCONTINUITY 策略，无命中再用前缀路径策略。
+ * @param {Array} segments - segment 数组
+ * @param {string} baseUrl - 用于解析相对路径
+ * @returns {Set<number>} 广告段索引集合
+ */
+export function detectAdSegments(segments, baseUrl) {
+  const discResult = detectByDiscontinuity(segments, baseUrl);
+  if (discResult.size > 0) return discResult;
+  return new Set();
+}
+
+/**
+ * 探测器工厂 — 从多个策略函数按顺序组合。
+ * 依次尝试每个策略，第一个返回非空结果者生效。
+ *
+ * @param {...Function} strategies - 策略函数列表，签名 (segments, baseUrl) => Set<number>
+ * @returns {Function} 组合探测器 (segments, baseUrl) => Set<number>
+ *
+ * @example
+ * const detector = createDetector(detectByDiscontinuity);
+
+ */
+export function createDetector(...strategies) {
+  return function (segments, baseUrl) {
+    for (const strategy of strategies) {
+      const result = strategy(segments, baseUrl);
+      if (result.size > 0) return result;
+    }
+    return new Set();
+  };
+}
+
+// ─── Playlist 解析 ─────────────────────────────────
+
+/**
  * 解析多码率 Master Playlist，提取各子流 URL（已转绝对路径）
  */
 export function parseMasterPlaylist(text, masterUrl) {
+  if (!text) return [];
   const lines = text.split("\n");
   const streams = [];
   let currentInfo = null;
@@ -94,14 +152,14 @@ export function parseMasterPlaylist(text, masterUrl) {
 
   return streams;
 }
+
 /**
  * 解析 Media Playlist，提取所有 segment
- * 与 proxy-server.mjs 逻辑一致
  * @param {string} text - m3u8 playlist 原始文本
  * @returns {{ segments: Array, hasDiscontinuity: boolean }}
  */
 export function parseM3u8Segments(text) {
-  const lines = text.split('\n');
+  const lines = text.split("\n");
   const segments = [];
   let currentExtinf = null;
   let currentKey = null;
@@ -111,14 +169,14 @@ export function parseM3u8Segments(text) {
     const line = lines[i].trim();
     if (!line) continue;
 
-    if (line.startsWith('#EXTINF:')) {
-      const duration = parseFloat(line.replace('#EXTINF:', '').replace(',', ''));
+    if (line.startsWith("#EXTINF:")) {
+      const duration = parseFloat(line.replace("#EXTINF:", "").replace(",", ""));
       currentExtinf = duration;
-    } else if (line.startsWith('#EXT-X-KEY:')) {
+    } else if (line.startsWith("#EXT-X-KEY:")) {
       currentKey = line;
-    } else if (line.startsWith('#EXT-X-DISCONTINUITY')) {
+    } else if (line.startsWith("#EXT-X-DISCONTINUITY")) {
       hasDiscontinuity = true;
-    } else if (!line.startsWith('#')) {
+    } else if (!line.startsWith("#")) {
       segments.push({
         url: line,
         duration: currentExtinf || 0,
@@ -126,6 +184,7 @@ export function parseM3u8Segments(text) {
         afterDiscontinuity: hasDiscontinuity,
       });
       currentExtinf = null;
+      hasDiscontinuity = false;
     }
   }
 
@@ -147,11 +206,11 @@ export function generateCleanPlaylist(segments, adIndices, baseUrl) {
   }
 
   const lines = [];
-  lines.push('#EXTM3U');
-  lines.push('#EXT-X-VERSION:3');
-  lines.push('#EXT-X-TARGETDURATION:10');
-  lines.push('#EXT-X-PLAYLIST-TYPE:VOD');
-  lines.push('#EXT-X-MEDIA-SEQUENCE:0');
+  lines.push("#EXTM3U");
+  lines.push("#EXT-X-VERSION:3");
+  lines.push("#EXT-X-TARGETDURATION:10");
+  lines.push("#EXT-X-PLAYLIST-TYPE:VOD");
+  lines.push("#EXT-X-MEDIA-SEQUENCE:0");
 
   let currentKey = null;
   for (const seg of cleanSegments) {
@@ -163,14 +222,14 @@ export function generateCleanPlaylist(segments, adIndices, baseUrl) {
       lines.push(resolvedKey);
       currentKey = seg.key;
     }
-    lines.push('#EXTINF:' + seg.duration.toFixed(3) + ',');
+    lines.push("#EXTINF:" + seg.duration.toFixed(3) + ",");
     lines.push(resolveUrl(baseUrl, seg.url));
   }
 
-  lines.push('#EXT-X-ENDLIST');
+  lines.push("#EXT-X-ENDLIST");
 
   return {
-    clean: lines.join('\n'),
+    clean: lines.join("\n"),
     adCount: segments.length - cleanSegments.length,
     totalCount: segments.length,
   };

@@ -204,14 +204,33 @@ const server = http.createServer(async (req, res) => {
   res.end("Not Found");
 });
 
-server.listen(PORT, () => {
-  console.log("✅ CV 代理服务器已启动: http://localhost:" + PORT);
-  console.log("   ─ API 代理:     /proxy?url=...");
-  console.log("   ─ m3u8 过滤:   /m3u8?url=...");
-  console.log("   ─ 健康检查:    /health");
-});
+function startServer(port) {
+  server.listen(port, () => {
+    console.log("✅ CV 代理服务器已启动: http://localhost:" + port);
+    console.log("   ─ API 代理:     /proxy?url=...");
+    console.log("   ─ m3u8 过滤:   /m3u8?url=...");
+    console.log("   ─ 健康检查:    /health");
+
+
+  });
+}
 
 server.on("error", (err) => {
-  console.error("❌ 代理服务器启动失败:", err.message);
-  process.exit(1);
+  if (err.code === "EADDRINUSE") {
+    const nextPort = port + 1;
+    if (nextPort > PORT + 10) {
+      console.error("❌ 端口 " + PORT + "~" + (PORT + 10) + " 均被占用，无法启动代理");
+      process.exit(1);
+    }
+    console.warn("⚠️  端口 " + port + " 被占用，尝试端口 " + nextPort + "...");
+    port = nextPort;
+    server.close();
+    startServer(port);
+  } else {
+    console.error("❌ 代理服务器启动失败:", err.message);
+    process.exit(1);
+  }
 });
+
+let port = PORT;
+startServer(port);

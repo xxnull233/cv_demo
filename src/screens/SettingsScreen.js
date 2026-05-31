@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import * as Clipboard from "expo-clipboard";
+import { STRATEGY_OPTIONS } from "../utils/m3u8Strategies";
 import { useSources } from "../context/SourceContext";
 
 const EMPTY_FORM = { name: "", api: "", excludeClass: "" };
@@ -26,6 +27,7 @@ export function SettingsScreen() {
     addSource,
     editSource,
     deleteSource,
+    updateSourceStrategy,
     importFromUrl,
     importFromJson,
     exportToJson
@@ -42,6 +44,7 @@ export function SettingsScreen() {
   const [showExport, setShowExport] = useState(false);
   const [exportJson, setExportJson] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [strategyPickerOpen, setStrategyPickerOpen] = useState(false);
 
   useEffect(function () {
     return function () {
@@ -73,7 +76,8 @@ export function SettingsScreen() {
     setForm({
       name: site.name || "",
       api: site.api || "",
-      excludeClass: typeof site.excludeClass === "string" ? site.excludeClass : ""
+      excludeClass: typeof site.excludeClass === "string" ? site.excludeClass : "",
+      adStrategy: site.adStrategy !== undefined ? site.adStrategy : "none"
     });
     setFormVisible(true);
   }
@@ -86,11 +90,16 @@ export function SettingsScreen() {
         api: form.api,
         excludeClass: form.excludeClass || ""
       });
+      if (form.adStrategy !== undefined) {
+        await updateSourceStrategy(editingKey, form.adStrategy);
+      }
     } else {
       await addSource(
         form.name,
         form.api,
-        form.excludeClass || ""
+        form.excludeClass || "",
+        true,
+        form.adStrategy !== undefined ? form.adStrategy : undefined
       );
     }
     setEditingKey("");
@@ -152,6 +161,7 @@ export function SettingsScreen() {
     setDeleteTarget(null);
     setEditingKey("");
     setForm(EMPTY_FORM);
+    setStrategyPickerOpen(false);
   }
 
   var isModalVisible = formVisible || showImportUrl || showImportJson || showExport || deleteTarget;
@@ -253,6 +263,44 @@ export function SettingsScreen() {
                   autoCapitalize="none"
                   style={styles.formInput}
                 />
+
+                {/* 广告过滤策略 — 下拉选择 */}
+                <View style={styles.pickerWrapper}>
+                  <Pressable
+                    style={styles.pickerButton}
+                    onPress={function () { setStrategyPickerOpen(function (v) { return !v; }); }}
+                  >
+                    <Text style={[styles.pickerButtonText, form.adStrategy === undefined && styles.pickerButtonTextMuted]}>
+                      {(function () {
+                        var match = form.adStrategy !== undefined && STRATEGY_OPTIONS.find(function (o) { return o.value === form.adStrategy; });
+                        return match ? match.label : "请选择过滤策略";
+                      })()}
+                    </Text>
+                    <Text style={styles.pickerArrow}>{strategyPickerOpen ? "▲" : "▼"}</Text>
+                  </Pressable>
+                  {strategyPickerOpen && (
+                    <View style={styles.pickerDropdown}>
+                      {STRATEGY_OPTIONS.map(function (opt) {
+                        var selected = (form.adStrategy || "") === opt.value;
+                        return (
+                          <Pressable
+                            key={opt.value}
+                            style={[styles.pickerOption, selected && styles.pickerOptionActive]}
+                            onPress={function () {
+                              updateForm("adStrategy", opt.value);
+                              setStrategyPickerOpen(false);
+                            }}
+                          >
+                            <Text style={[styles.pickerOptionText, selected && styles.pickerOptionTextActive]}>
+                              {selected ? "✓ " : "  "}{opt.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+
                 <View style={styles.panelActions}>
                   <Pressable style={styles.panelCancelBtn} onPress={closeModal}>
                     <Text style={styles.panelCancelText}>取消</Text>
@@ -558,6 +606,70 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginBottom: 8,
     fontSize: 14
+  },
+  formLabel: {
+    color: "#9ca3af",
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 6,
+    marginTop: 4
+  },
+  pickerWrapper: {
+    position: "relative",
+    zIndex: 10,
+    marginBottom: 12
+  },
+  pickerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    backgroundColor: "#111",
+    paddingHorizontal: 14
+  },
+  pickerButtonText: {
+    flex: 1,
+    color: "#f8fafc",
+    fontSize: 14
+  },
+  pickerButtonTextMuted: {
+    color: "#737373"
+  },
+  pickerArrow: {
+    color: "#8a8a8a",
+    fontSize: 10,
+    marginLeft: 8
+  },
+  pickerDropdown: {
+    position: "absolute",
+    top: 44,
+    left: 0,
+    right: 0,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    overflow: "hidden",
+    zIndex: 20
+  },
+  pickerOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#252525"
+  },
+  pickerOptionActive: {
+    backgroundColor: "#0a2a1a"
+  },
+  pickerOptionText: {
+    color: "#a0a0a0",
+    fontSize: 13
+  },
+  pickerOptionTextActive: {
+    color: "#4ade80",
+    fontWeight: "700"
   },
   panelActions: {
     flexDirection: "row",

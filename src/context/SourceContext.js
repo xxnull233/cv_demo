@@ -1,4 +1,5 @@
 ﻿import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { STRATEGY_VALUES } from "../utils/m3u8Strategies";
 import {
   loadAllSources,
   saveAllSources,
@@ -50,8 +51,8 @@ export function SourceProvider({ children }) {
     setSources(next);
   }
 
-  async function addSource(name, api, excludeClass, enabled) {
-    const source = { key: generateKey(), name: String(name).trim(), api: String(api).trim(), excludeClass: typeof excludeClass === "string" ? excludeClass : "", enabled: enabled !== false };
+  async function addSource(name, api, excludeClass, enabled, adStrategy) {
+    const source = { key: generateKey(), name: String(name).trim(), api: String(api).trim(), excludeClass: typeof excludeClass === "string" ? excludeClass : "", enabled: enabled !== false, adStrategy: adStrategy || "" };
     const next = sources.concat([source]);
     await saveAllSources(next);
     setSources(next);
@@ -70,6 +71,16 @@ export function SourceProvider({ children }) {
 
   async function deleteSource(key) {
     var next = sources.filter(function(s) { return s.key !== key; });
+    await saveAllSources(next);
+    setSources(next);
+  }
+
+  async function updateSourceStrategy(key, strategy) {
+    if (!STRATEGY_VALUES.includes(strategy)) return;
+    const next = sources.map(function(s) {
+      if (s.key === key) { return { ...s, adStrategy: strategy }; }
+      return s;
+    });
     await saveAllSources(next);
     setSources(next);
   }
@@ -102,6 +113,7 @@ export function SourceProvider({ children }) {
     addSource,
     editSource,
     deleteSource,
+    updateSourceStrategy,
     importFromJson,
     importFromUrl,
     exportToJson
@@ -115,4 +127,3 @@ export function useSources() {
   if (!context) { throw new Error("useSources must be used within SourceProvider"); }
   return context;
 }
-

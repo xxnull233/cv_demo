@@ -6,6 +6,9 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#050505"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -21,6 +24,7 @@
       "bundleIdentifier": "com.anonymous.cv"
     },
     "android": {
+      "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#050505"

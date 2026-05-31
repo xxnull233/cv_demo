@@ -280,7 +280,7 @@ export function SettingsScreen() {
                   placeholder="输入 JSON 远程地址"
                   placeholderTextColor="#737373"
                   autoCapitalize="none"
-                  autoFocus
+                  multiline
                   style={styles.formInput}
                 />
                 <View style={styles.panelActions}>
@@ -308,7 +308,7 @@ export function SettingsScreen() {
                   value={exportJson}
                   editable={false}
                   multiline
-                  style={[styles.formInput, { minHeight: 120, maxHeight: 200 }]} scrollEnabled
+                  style={[styles.formInput, { minHeight: 120, maxHeight: 300 }]} scrollEnabled
                 />
                 <View style={styles.panelActions}>
                   <Pressable style={styles.panelCancelBtn} onPress={closeModal}>
@@ -336,9 +336,8 @@ export function SettingsScreen() {
                   placeholder="粘贴源列表 JSON"
                   placeholderTextColor="#737373"
                   autoCapitalize="none"
-                  autoFocus
                   multiline
-                  style={[styles.formInput, { minHeight: 100, maxHeight: 200 }]} scrollEnabled
+                  style={[styles.formInput, { minHeight: 120, maxHeight: 300 }]} scrollEnabled
                 />
                 <View style={styles.panelActions}>
                   <Pressable style={styles.panelCancelBtn} onPress={closeModal}>

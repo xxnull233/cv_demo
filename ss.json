@@ -1,0 +1,8 @@
+[
+  {
+    "name": "如意资源",
+    "api": "https://cj.rycjapi.com/api.php/provide/vod",
+    "excludeClass": "1,2,3,4",
+    "enabled": true
+  }
+]

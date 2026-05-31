@@ -283,7 +283,7 @@ export function PlayerScreen() {
       <ExpoStatusBar style="light" backgroundColor="#050505" translucent={false} />
       <View style={styles.playerHeader}>
         <Pressable style={styles.ghostButton} onPress={handleBack}>
-          <Text style={styles.ghostButtonText}>{"\u8fd4\u56de"}</Text>
+          <Text style={styles.ghostButtonText}>{"返回"}</Text>
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
           {currentDetail.title}
@@ -334,10 +334,10 @@ export function PlayerScreen() {
 
       <ScrollView style={styles.playerContent}>
         <Text style={styles.nowPlaying} numberOfLines={2}>
-          {currentEpisode?.title || ("\u7b2c " + (currentEpisodeIndex + 1) + " \u96c6")}
+          {currentEpisode?.title || ("第 " + (currentEpisodeIndex + 1) + " 集")}
         </Text>
         <Text style={styles.resultMeta}>
-          {currentDetail.sourceName} {"\u00b7"} {"\u5171"} {episodes.length} {"\u96c6"}
+          {currentDetail.sourceName} {"· 共"} {episodes.length} {"集"}
         </Text>
 
         {lines.length > 1 && (
@@ -391,7 +391,7 @@ export function PlayerScreen() {
 
         {!!currentDetail.desc && (
           <View style={styles.detailBlock}>
-            <Text style={styles.sectionTitle}>{"\u7b80\u4ecb"}</Text>
+            <Text style={styles.sectionTitle}>{"简介"}</Text>
             <Text style={styles.description}>{currentDetail.desc}</Text>
           </View>
         )}

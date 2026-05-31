@@ -102,11 +102,12 @@ npm run check            # Babel 编译检查 + 播放地址解析检查
 - HTTP 源已在 `app.json` 配置明文流量允许（`usesCleartextTraffic` / ATS）
 - 本地数据（历史、收藏、源设置）保存在 AsyncStorage，卸载 App 会丢失
 - `src/utils/m3u8Filter.js` 导出 `filterSegmentsText(text, baseUrl)`，可在任何平台独立使用（纯 JS，无平台依赖）
+- 配置源示例 `https://cdn.jsdelivr.net/gh/xxnull233/cv_demo@main/ss.json`
 
 ## 项目结构
 
 ```
-mobile/
+cvdemo/
 ├── App.js                 # 入口：Provider + 导航 + 启动缓存清理
 ├── src/
 │   ├── api/               # 搜索、分类、详情、解析

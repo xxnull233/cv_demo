@@ -293,7 +293,7 @@ export function PlayerScreen() {
   }, [windowWidth]);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={fullscreenMode !== "normal" ? [] : undefined}>
+    <SafeAreaView style={styles.safeArea} edges={fullscreenMode === "landscape" ? [] : undefined}>
       <ExpoStatusBar style="light" backgroundColor="#050505" translucent={false} />
       <View style={[styles.videoWrapper, fullscreenMode !== "normal" && { flex: 1 }]}>
         {isHlsOnWeb ? (

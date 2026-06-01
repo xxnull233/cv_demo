@@ -1,10 +1,10 @@
-import { useEvent } from "expo";
 import { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 /**
  * Bilibili 风格播放器控制覆盖层
- * 三层结构：顶部返回条 + 中心播放按钮 + 底部控制栏
+ * 安全模式：不拦截触摸事件（依赖下方原生控件处理播放/暂停），
+ * 仅渲染视觉覆盖层：顶部返回+标题、中心播放/暂停指示、底部进度条+时间
  *
  * Props:
  *   player    - VideoPlayer 实例
@@ -13,27 +13,19 @@ import { Animated, Pressable, Text, View } from "react-native";
  *   style     - 覆盖层容器样式
  */
 export function PlayerControls({ player, title, onBack, style }) {
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const opacity = useRef(new Animated.Value(1)).current;
-  const hideTimer = useRef(null);
-
-  // 播放状态
-  const { isPlaying } = useEvent(player, "playingChange", {
-    isPlaying: player.playing,
-  });
-
-  // 时间和进度
+  const [isPlaying, setIsPlaying] = useState(player?.playing ?? false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [barWidth, setBarWidth] = useState(0);
 
+  // 轮询播放状态和时间（避免 useEvent 在 v2.2.2 上不可靠）
   useEffect(() => {
+    if (!player) return;
     function tick() {
       try {
-        const t = player.currentTime || 0;
-        const d = player.duration || 0;
-        setCurrentTime(t);
-        setDuration(d);
+        setIsPlaying(player.playing);
+        setCurrentTime(player.currentTime || 0);
+        setDuration(player.duration || 0);
       } catch {}
     }
     tick();
@@ -41,49 +33,8 @@ export function PlayerControls({ player, title, onBack, style }) {
     return () => clearInterval(interval);
   }, [player]);
 
-  // 自动隐藏
-  useEffect(() => {
-    if (!controlsVisible) return;
-    if (!isPlaying) return;
-
-    hideTimer.current = setTimeout(() => {
-      fadeOut();
-    }, 3000);
-
-    return () => {
-      if (hideTimer.current) clearTimeout(hideTimer.current);
-    };
-  }, [controlsVisible, isPlaying]);
-
-  function fadeOut() {
-    Animated.timing(opacity, {
-      toValue: 0,
-      duration: 400,
-      useNativeDriver: true,
-    }).start(function () {
-      setControlsVisible(false);
-    });
-  }
-
-  function fadeIn() {
-    setControlsVisible(true);
-    Animated.timing(opacity, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  }
-
-  function toggleControls() {
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-    if (controlsVisible) {
-      fadeOut();
-    } else {
-      fadeIn();
-    }
-  }
-
   function handlePlayPause() {
+    if (!player) return;
     if (player.playing) {
       player.pause();
     } else {
@@ -103,31 +54,10 @@ export function PlayerControls({ player, title, onBack, style }) {
   }
 
   const progressRatio = duration > 0 ? currentTime / duration : 0;
-
-  function formatTime(seconds) {
-    if (!seconds || isNaN(seconds)) return "00:00";
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    if (h > 0) {
-      return (
-        String(h).padStart(2, "0") +
-        ":" +
-        String(m).padStart(2, "0") +
-        ":" +
-        String(s).padStart(2, "0")
-      );
-    }
-    return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
-  }
-
   const isEnded = duration > 0 && currentTime >= duration - 0.5;
 
   return (
-    <Animated.View style={[{ opacity }, style]} pointerEvents="box-none">
-      {/* 点击区域 — 切换控件显隐 */}
-      <Pressable style={controlsTouchArea} onPress={toggleControls} />
-
+    <View style={[style, containerStyle]} pointerEvents="box-none">
       {/* 顶部条 */}
       <View style={topBarStyle} pointerEvents="box-none">
         <Pressable style={backBtnStyle} onPress={onBack}>
@@ -140,7 +70,7 @@ export function PlayerControls({ player, title, onBack, style }) {
       </View>
 
       {/* 中心播放/重播按钮 */}
-      {(!isPlaying || isEnded) && controlsVisible && (
+      {(!isPlaying || isEnded) && (
         <Pressable style={centerBtnStyle} onPress={handlePlayPause}>
           <Text style={centerBtnTextStyle}>{isEnded ? "↻" : "▶"}</Text>
         </Pressable>
@@ -154,7 +84,9 @@ export function PlayerControls({ player, title, onBack, style }) {
           onPress={handleProgressTap}
         >
           <View style={progressTrackStyle}>
-            <View style={[progressFillStyle, { width: (progressRatio * 100) + "%" }]} />
+            <View
+              style={[progressFillStyle, { width: (progressRatio * 100) + "%" }]}
+            />
           </View>
         </Pressable>
         <View style={controlsRowStyle}>
@@ -166,13 +98,28 @@ export function PlayerControls({ player, title, onBack, style }) {
           </Text>
         </View>
       </View>
-    </Animated.View>
+    </View>
   );
+}
+
+function formatTime(seconds) {
+  if (!seconds || isNaN(seconds)) return "00:00";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) {
+    return (
+      String(h).padStart(2, "0") +
+      ":" + String(m).padStart(2, "0") +
+      ":" + String(s).padStart(2, "0")
+    );
+  }
+  return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
 }
 
 // ─── 内联样式 ───
 
-const controlsTouchArea = {
+const containerStyle = {
   position: "absolute",
   top: 0,
   left: 0,

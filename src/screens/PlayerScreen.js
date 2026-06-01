@@ -276,6 +276,22 @@ export function PlayerScreen() {
     return null;
   }
 
+  // Web 端视频上方的浮层返回按钮
+  const webBackBtn = {
+    position: "absolute",
+    top: 8,
+    left: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  };
+  const webBackBtnText = {
+    color: "#f8fafc",
+    fontSize: 14,
+    fontWeight: "700",
+  };
+
   const episodeButtonWidth = useMemo(() => {
     const availableWidth = Math.max(
       0,
@@ -293,27 +309,23 @@ export function PlayerScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ExpoStatusBar style="light" backgroundColor="#050505" translucent={false} />
-      <View style={styles.playerHeader}>
-        <Pressable style={styles.ghostButton} onPress={handleBack}>
-          <Text style={styles.ghostButtonText}>{"返回"}</Text>
-        </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {currentDetail.title}
-        </Text>
-      </View>
-
       <View style={styles.videoWrapper}>
         {isHlsOnWeb ? (
-          <HlsVideo
-            key={hlsRetryKey}
-            uri={getPlayerUrl(currentEpisode?.url)}
-            style={styles.video}
-            contentFit="contain"
-            onError={setHlsError}
-            onTimeUpdate={(t) => { hlsTimeRef.current = t; }}
-            onFirstFrameRender={() => {}}
-            initialTime={savedPlaybackTime.current}
-          />
+          <View>
+            <HlsVideo
+              key={hlsRetryKey}
+              uri={getPlayerUrl(currentEpisode?.url)}
+              style={styles.video}
+              contentFit="contain"
+              onError={setHlsError}
+              onTimeUpdate={(t) => { hlsTimeRef.current = t; }}
+              onFirstFrameRender={() => {}}
+              initialTime={savedPlaybackTime.current}
+            />
+            <Pressable style={webBackBtn} onPress={handleBack}>
+              <Text style={webBackBtnText}>{"返回"}</Text>
+            </Pressable>
+          </View>
         ) : filtering ? (
           <View style={styles.video}>
             <View style={styles.playerOverlay}>
@@ -328,6 +340,8 @@ export function PlayerScreen() {
             key={`mobile-${mobileRetryKey}-${currentEpisode?.url || index}`}
             uri={filteredUri}
             style={styles.video}
+            title={currentDetail?.title}
+            onBack={handleBack}
             initialTime={savedPlaybackTime.current}
             onTimeUpdate={(t) => { mobileTimeRef.current = t; }}
             onError={setMobileError}

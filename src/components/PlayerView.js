@@ -1,16 +1,22 @@
 import { useEvent } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useRef } from "react";
+import { View } from "react-native";
+
+import { PlayerControls } from "./PlayerControls";
 
 /**
  * 播放器子组件 — 仅在合法 URI 传入时才挂载
  *
- * 将 useVideoPlayer 封装在此组件内，确保播放器首次创建时
- * 永远收到有效源（不会以 null 初始化），避免空源导致的错误状态。
+ * 使用原生控件播放，同时叠加 Bilibili 风格的自定义控制覆盖层。
+ * 覆盖层不拦截触摸事件（pointerEvents="box-none"），
+ * 播放/暂停依赖原生控件，覆盖层仅提供视觉增强和快捷操作。
  */
 export function PlayerView({
   uri,
   style,
+  title,
+  onBack,
   onTimeUpdate,
   onFirstFrameRender,
   onError,
@@ -70,12 +76,20 @@ export function PlayerView({
   }
 
   return (
-    <VideoView
-      player={player}
-      style={style}
-      nativeControls
-      contentFit="contain"
-      onFirstFrameRender={handleFirstFrameRender}
-    />
+    <View style={style}>
+      <VideoView
+        player={player}
+        style={{ flex: 1 }}
+        nativeControls
+        contentFit="contain"
+        onFirstFrameRender={handleFirstFrameRender}
+      />
+      <PlayerControls
+        player={player}
+        title={title}
+        onBack={onBack}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+      />
+    </View>
   );
 }

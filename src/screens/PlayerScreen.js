@@ -108,6 +108,7 @@ export function PlayerScreen() {
   const [filteredUri, setFilteredUri] = useState(null);
   const [mobileRetryKey, setMobileRetryKey] = useState(0);
   const [mobileError, setMobileError] = useState(false);
+  const [pageFullscreen, setPageFullscreen] = useState(false);
   const mobileFileRef = useRef(null); // 缓存文件路径 (string)
   const mobileTimeRef = useRef(0); // PlayerView 定期同步 currentTime 到此 ref
   const lastSavedTimeRef = useRef(0); // 上次保存的播放时间，用于脏检查
@@ -325,6 +326,7 @@ export function PlayerScreen() {
             initialTime={savedPlaybackTime.current}
             onTimeUpdate={(t) => { mobileTimeRef.current = t; }}
             onError={setMobileError}
+            onFullscreenChange={setPageFullscreen}
           />
         )}
 
@@ -338,7 +340,8 @@ export function PlayerScreen() {
         )}
       </View>
 
-      <ScrollView style={styles.playerContent}>
+      {!pageFullscreen && (
+        <ScrollView style={styles.playerContent}>
         <Text style={styles.nowPlaying} numberOfLines={2}>
           {currentEpisode?.title || ("第 " + (currentEpisodeIndex + 1) + " 集")}
         </Text>
@@ -401,7 +404,7 @@ export function PlayerScreen() {
             <Text style={styles.description}>{currentDetail.desc}</Text>
           </View>
         )}
-      </ScrollView>
+      </ScrollView>)}
     </SafeAreaView>
   );
 }

@@ -7,7 +7,7 @@ import Svg, { Path } from "react-native-svg";
 /**
  * 播放器控制覆盖层 — 与 Web 端全功能同步
  */
-export function PlayerControls({ player, title, onBack, style }) {
+export function PlayerControls({ player, title, onBack, style, onFullscreenChange }) {
   // ── 状态 ──
   const [isPlaying, setIsPlaying] = useState(player?.playing ?? false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -16,7 +16,7 @@ export function PlayerControls({ player, title, onBack, style }) {
   const [showSpeed, setShowSpeed] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [buffering, setBuffering] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenMode, setFullscreenMode] = useState("normal");
   const [seeking, setSeeking] = useState(false);
   const [seekTime, setSeekTime] = useState(0);
 
@@ -30,6 +30,10 @@ export function PlayerControls({ player, title, onBack, style }) {
   const opacityAnim = useRef(new Animated.Value(1)).current;
   const gestureStartX = useRef(0);
   const gestureSwiping = useRef(false);
+  const seekTimeRef = useRef(0);
+  const currentTimeRef = useRef(0);
+  const durationRef = useRef(0);
+  const playerRef = useRef(player);
 
   // ── 轮询播放状态和时间 ──
   useEffect(() => {
@@ -41,6 +45,8 @@ export function PlayerControls({ player, title, onBack, style }) {
         var d = player.duration || 0;
         setCurrentTime(t);
         setDuration(d);
+        currentTimeRef.current = t;
+        durationRef.current = d;
       } catch {}
     }
     tick();
@@ -48,13 +54,15 @@ export function PlayerControls({ player, title, onBack, style }) {
     return function () { clearInterval(interval); };
   }, [player]);
 
-  // ── 监听系统全屏/方向变化 ──
+  useEffect(() => { playerRef.current = player; }, [player]);
+
+  // ── 监听系统全屏/方向变化（物理旋转时自动切换，手动锁定时不触发）──
   useEffect(function () {
     var listener = ScreenOrientation.addOrientationChangeListener(function (event) {
       var isLandscape = event.orientationLock === ScreenOrientation.OrientationLock.LANDSCAPE ||
                         event.orientationLock === ScreenOrientation.OrientationLock.LANDSCAPE_LEFT ||
                         event.orientationLock === ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT;
-      setIsFullscreen(isLandscape);
+      setFullscreenMode(isLandscape ? "landscape" : "normal");
     });
     return function () { ScreenOrientation.removeOrientationChangeListener(listener); };
   }, []);
@@ -113,6 +121,30 @@ export function PlayerControls({ player, title, onBack, style }) {
     }, 350);
   }
 
+  // ── 全屏切换 ──
+  function enterPortraitFS() {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
+    setFullscreenMode("portrait");
+    onFullscreenChange?.(true);
+  }
+  function enterLandscapeFS() {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(function () {});
+    setFullscreenMode("landscape");
+    onFullscreenChange?.(true);
+  }
+  function exitFS() {
+    ScreenOrientation.unlockAsync().catch(function () {});
+    setFullscreenMode("normal");
+    onFullscreenChange?.(false);
+  }
+  function handleBackPress() {
+    if (fullscreenMode !== "normal") {
+      exitFS();
+    } else {
+      onBack();
+    }
+  }
+
   // ── 进度条 ──
   function handleProgressLayout(e) { barWidthRef.current = e.nativeEvent.layout.width; }
   function handleProgressTap(e) {
@@ -123,9 +155,9 @@ export function PlayerControls({ player, title, onBack, style }) {
 
   // ── 滑动手势 ──
   function handleSeekStart(x) {
-    if (!duration) return;
+    if (!durationRef.current) return;
     seekStartX.current = x;
-    seekStartTime.current = currentTime;
+    seekStartTime.current = currentTimeRef.current;
     setShowSpeed(false);
   }
   function handleSeekMove(x) {
@@ -139,16 +171,18 @@ export function PlayerControls({ player, title, onBack, style }) {
       setShowControls(true);
       setSeeking(true);
     }
-    var ratio = Math.max(0, Math.min(1, dx / barWidthRef.current));
-    setSeekTime(Math.max(0, Math.min(duration, seekStartTime.current + ratio * duration)));
+    var ratio = dx / (barWidthRef.current || 1);
+    var computed = Math.max(0, Math.min(durationRef.current, seekStartTime.current + ratio * durationRef.current));
+    setSeekTime(computed);
+    seekTimeRef.current = computed;
   }
   function handleSeekEnd() {
     if (!seekingRef.current) return;
-    var target = seekTime;
+    var target = seekTimeRef.current;
     seekingRef.current = false;
     setSeeking(false);
     setCurrentTime(target);
-    if (player) player.currentTime = target;
+    if (playerRef.current) playerRef.current.currentTime = target;
   }
 
   // ── 圆点拖动（用 PanResponder）──
@@ -210,13 +244,15 @@ export function PlayerControls({ player, title, onBack, style }) {
             setSeekTime(currentTime);
           }
           if (gestureSwiping.current && duration > 0) {
-            var ratio = Math.max(0, Math.min(1, dx / (barWidthRef.current || 300)));
-            setSeekTime(Math.max(0, Math.min(duration, seekStartTime.current + ratio * duration)));
+            var ratio = dx / (barWidthRef.current || 300);
+            var computed = Math.max(0, Math.min(duration, seekStartTime.current + ratio * duration));
+            setSeekTime(computed);
+            seekTimeRef.current = computed;
           }
         }}
         onResponderRelease={() => {
           if (gestureSwiping.current) {
-            var target = seekTime;
+            var target = seekTimeRef.current;
             seekingRef.current = false;
             setSeeking(false);
             setCurrentTime(target);
@@ -246,10 +282,10 @@ export function PlayerControls({ player, title, onBack, style }) {
       )}
 
       {/* 控件覆盖层 */}
-      <Animated.View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: opacityAnim, zIndex: 10 }, showControls ? {} : { display: "none" }]} pointerEvents="box-none">
+      <Animated.View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: opacityAnim, zIndex: 10, justifyContent: "space-between" }, showControls ? {} : { display: "none" }]} pointerEvents="box-none">
         {/* 顶部栏 */}
         <LinearGradient colors={["rgba(0,0,0,0.5)", "transparent"]} style={topBar}>
-          <Pressable style={backBtn} onPress={onBack}>
+          <Pressable style={backBtn} onPress={handleBackPress}>
             <Svg width="24" height="24" viewBox="0 0 24 24" fill="#f8fafc">
               <Path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
             </Svg>
@@ -313,32 +349,23 @@ export function PlayerControls({ player, title, onBack, style }) {
               )}
             </View>
 
-            {/* 全屏：非全屏时显示两个入口，全屏时显示一个出口 */}
-            {isFullscreen ? (
-              <Pressable onPress={function () {
-                ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
-                setIsFullscreen(false);
-              }} style={iconBtn}>
-                <Svg width="20" height="20" viewBox="0 0 24 24" fill="#f8fafc">
-                  <Path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+            {/* 全屏模式切换 */}
+            {fullscreenMode !== "normal" ? (
+              <Pressable onPress={exitFS} style={iconBtn}>
+                <Svg width="20" height="20" viewBox="0 -960 960 960" fill="#f8fafc">
+                  <Path d="m136-80-56-56 264-264H160v-80h320v320h-80v-184L136-80Zm344-400v-320h80v184l264-264 56 56-264 264h184v80H480Z"/>
                 </Svg>
               </Pressable>
             ) : (
               <>
-                <Pressable onPress={function () {
-                  ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(function () {});
-                  setIsFullscreen(true);
-                }} style={iconBtn}>
-                  <Svg width="20" height="20" viewBox="0 0 24 24" fill="#f8fafc">
-                    <Path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                <Pressable onPress={enterPortraitFS} style={iconBtn}>
+                  <Svg width="20" height="20" viewBox="0 -960 960 960" fill="#f8fafc">
+                    <Path d="M200-680v-120q0-33 23.5-56.5T280-880h120v80H280v120h-80Zm80 600q-33 0-56.5-23.5T200-160v-120h80v120h120v80H280Zm400-600v-120H560v-80h120q33 0 56.5 23.5T760-800v120h-80ZM560-80v-80h120v-120h80v120q0 33-23.5 56.5T680-80H560Z"/>
                   </Svg>
                 </Pressable>
-                <Pressable onPress={function () {
-                  ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
-                  setIsFullscreen(false);
-                }} style={iconBtn}>
-                  <Svg width="20" height="20" viewBox="0 0 24 24" fill="#f8fafc">
-                    <Path d="M10 16h-2v2h2v-2zm-4-2H4v2h2v-2zm14-4h-2v2h2v-2z"/>
+                <Pressable onPress={enterLandscapeFS} style={iconBtn}>
+                  <Svg width="20" height="20" viewBox="0 -960 960 960" fill="#f8fafc">
+                    <Path d="M800-560v-120H680v-80h120q33 0 56.5 23.5T880-680v120h-80Zm-720 0v-120q0-33 23.5-56.5T160-760h120v80H160v120H80Zm600 360v-80h120v-120h80v120q0 33-23.5 56.5T800-200H680Zm-520 0q-33 0-56.5-23.5T80-280v-120h80v120h120v80H160Z"/>
                   </Svg>
                 </Pressable>
               </>

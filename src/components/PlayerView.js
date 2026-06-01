@@ -20,6 +20,7 @@ export function PlayerView({
   onTimeUpdate,
   onFirstFrameRender,
   onError,
+  onFullscreenChange,
   initialTime = 0,
 }) {
   const player = useVideoPlayer(uri, (player) => {
@@ -88,6 +89,7 @@ export function PlayerView({
         player={player}
         title={title}
         onBack={onBack}
+        onFullscreenChange={onFullscreenChange}
         style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
       />
     </View>

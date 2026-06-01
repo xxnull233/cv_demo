@@ -293,9 +293,9 @@ export function PlayerScreen() {
   }, [windowWidth]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={fullscreenMode !== "normal" ? [] : undefined}>
       <ExpoStatusBar style="light" backgroundColor="#050505" translucent={false} />
-      <View style={[styles.videoWrapper, fullscreenMode === "portrait" && { flex: 1, justifyContent: "center" }, fullscreenMode === "landscape" && { flex: 1 }]}>
+      <View style={[styles.videoWrapper, fullscreenMode !== "normal" && { flex: 1 }]}>
         {isHlsOnWeb ? (
           <HlsVideo
             key={hlsRetryKey}
@@ -321,7 +321,7 @@ export function PlayerScreen() {
           <PlayerView
             key={`mobile-${mobileRetryKey}-${currentEpisode?.url || index}`}
             uri={filteredUri}
-            style={[styles.video, fullscreenMode === "landscape" && { aspectRatio: undefined, flex: 1 }]}
+            style={[styles.video, fullscreenMode !== "normal" && { aspectRatio: undefined, flex: 1 }]}
             title={currentDetail?.title}
             onBack={handleBack}
             contentFit="contain"

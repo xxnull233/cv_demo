@@ -193,7 +193,7 @@ export function HlsVideo({
         style={{ width: "100%", height: "100%", objectFit: contentFit, ...(style || {}) }}
       />
       {buffering && (
-        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 20, color: "#f8fafc", fontSize: 20, fontWeight: "700", background: "rgba(0,0,0,0.55)", padding: "8px 18px", borderRadius: 8, pointerEvents: "none" }}>
+        <div style={{ position: "absolute", top: "30%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 20, color: "#f8fafc", fontSize: 16, fontWeight: "700", background: "rgba(0,0,0,0.55)", padding: "8px 18px", borderRadius: 8, pointerEvents: "none" }}>
           {"正在缓冲..."}
         </div>
       )}
@@ -229,7 +229,7 @@ export function HlsVideo({
         style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }}
       />
       {seeking && (
-        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "rgba(0,0,0,0.65)", color: "#f8fafc", padding: "6px 18px", borderRadius: 8, fontSize: 20, fontWeight: "700", pointerEvents: "none", zIndex: 20, whiteSpace: "nowrap" }}>
+        <div style={{ position: "absolute", top: "30%", left: "50%", transform: "translate(-50%, -50%)", background: "rgba(0,0,0,0.65)", color: "#f8fafc", padding: "6px 18px", borderRadius: 8, fontSize: 16, fontWeight: "700", pointerEvents: "none", zIndex: 20, whiteSpace: "nowrap" }}>
           {fmt(seekTime)} / {fmt(getDur())}
         </div>
       )}

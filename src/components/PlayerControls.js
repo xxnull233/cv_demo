@@ -1,4 +1,3 @@
-import { useEvent } from "expo";
 import { useEffect, useRef, useState } from "react";
 import { Animated, PanResponder, Pressable, StatusBar, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -64,14 +63,15 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
     return function () { ScreenOrientation.unlockAsync().catch(function () {}); };
   }, []);
 
-  // ── 缓冲状态 —— 事件驱动，取代轮询 ──
-  var statusEvent = useEvent(player, "statusChange", {
-    status: player?.status,
-  });
-  var currentPlayerStatus = statusEvent?.status || player?.status;
+  // ── 缓冲状态 —— 使用 addListener ──
   useEffect(() => {
-    setBuffering(currentPlayerStatus === "loading");
-  }, [currentPlayerStatus]);
+    if (!player) return;
+    setBuffering(player.status === "loading");
+    var sub = player.addListener("statusChange", function (event) {
+      setBuffering(event.status === "loading");
+    });
+    return function () { sub.remove(); };
+  }, [player]);
 
   // ── 自动隐藏 ──
   useEffect(() => {
@@ -219,32 +219,33 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
 
   return (
     <View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, style]} pointerEvents="box-none">
-      {/* 点击处理 —— Pressable，不争夺子元素触摸 */}
-      <Pressable
-        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-        onPress={handleTap}
-      />
-      {/* 滑动处理 —— 仅在移动时认领手势 */}
+      {/* 全屏手势处理 —— 点击 + 滑动 */}
       <View
         style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-        onStartShouldSetResponder={() => false}
-        onMoveShouldSetResponder={(e) => {
-          return Math.abs(e.nativeEvent.pageX - gestureStartX.current) > 5;
-        }}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
         onResponderGrant={(e) => {
-          gestureSwiping.current = true;
-          setShowSpeed(false);
-          setSeeking(true);
-          setShowControls(true);
-          seekStartX.current = e.nativeEvent.pageX;
-          seekStartTime.current = currentTime;
-          seekingRef.current = true;
-          setSeekTime(currentTime);
+          gestureStartX.current = e.nativeEvent.pageX;
+          gestureSwiping.current = false;
         }}
         onResponderMove={(e) => {
           var x = e.nativeEvent.pageX;
-          var dx = x - seekStartX.current;
-          if (duration > 0) {
+          var dx = x - gestureStartX.current;
+          if (!gestureSwiping.current && Math.abs(dx) > 10) {
+            gestureSwiping.current = true;
+            if (clickTimer.current) {
+              clearTimeout(clickTimer.current);
+              clickTimer.current = null;
+            }
+            setShowSpeed(false);
+            setSeeking(true);
+            setShowControls(true);
+            seekStartX.current = x;
+            seekStartTime.current = currentTime;
+            seekingRef.current = true;
+            setSeekTime(currentTime);
+          }
+          if (gestureSwiping.current && duration > 0) {
             var ratio = dx / (barWidthRef.current || 300);
             var computed = Math.max(0, Math.min(duration, seekStartTime.current + ratio * duration));
             setSeekTime(computed);
@@ -252,14 +253,15 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
           }
         }}
         onResponderRelease={() => {
-          var target = seekTimeRef.current;
-          seekingRef.current = false;
-          setSeeking(false);
-          setCurrentTime(target);
-          if (player) player.currentTime = target;
-        }}
-        onTouchStart={(e) => {
-          gestureStartX.current = e.nativeEvent.pageX;
+          if (gestureSwiping.current) {
+            var target = seekTimeRef.current;
+            seekingRef.current = false;
+            setSeeking(false);
+            setCurrentTime(target);
+            if (player) player.currentTime = target;
+          } else {
+            handleTap();
+          }
         }}
       />
 
@@ -349,14 +351,8 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
               )}
             </View>
 
-            {/* 全屏模式切换 */}
-            {fullscreenMode !== "normal" ? (
-              <Pressable onPress={exitFS} style={iconBtn}>
-                <Svg width="20" height="20" viewBox="0 -960 960 960" fill="#f8fafc">
-                  <Path d="m136-80-56-56 264-264H160v-80h320v320h-80v-184L136-80Zm344-400v-320h80v184l264-264 56 56-264 264h184v80H480Z"/>
-                </Svg>
-              </Pressable>
-            ) : (
+            {/* 全屏入口按钮（仅普通模式显示，全屏时通过返回按钮退出） */}
+            {fullscreenMode === "normal" && (
               <>
                 <Pressable onPress={enterPortraitFS} style={iconBtn}>
                   <Svg width="20" height="20" viewBox="0 -960 960 960" fill="#f8fafc">
@@ -392,13 +388,13 @@ function fmt(sec) {
 }
 
 // ─── 样式 ───
-var bufferingContainer = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", zIndex: 30, pointerEvents: "none" };
+var bufferingContainer = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", zIndex: 20, pointerEvents: "none" };
 var bufferingInner = { backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 18, paddingVertical: 6, borderRadius: 8 };
-var bufferingText = { color: "#f8fafc", fontSize: 20, fontWeight: "700" };
+var bufferingText = { color: "#f8fafc", fontSize: 16, fontWeight: "700" };
 
-var seekOverlay = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", zIndex: 30, pointerEvents: "none" };
+var seekOverlay = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", zIndex: 20, pointerEvents: "none" };
 var seekOverlayInner = { backgroundColor: "rgba(0,0,0,0.65)", paddingHorizontal: 18, paddingVertical: 6, borderRadius: 8 };
-var seekOverlayText = { color: "#f8fafc", fontSize: 20, fontWeight: "700" };
+var seekOverlayText = { color: "#f8fafc", fontSize: 16, fontWeight: "700" };
 
 var topBar = { paddingTop: 8, paddingHorizontal: 12, paddingBottom: 14, flexDirection: "row", alignItems: "center" };
 var backBtn = { paddingVertical: 6, paddingRight: 8 };
@@ -418,7 +414,7 @@ var timeText = { color: "#9ca3af", fontSize: 11, fontWeight: "600", letterSpacin
 
 var speedBtn = { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.08)" };
 var speedBtnText = { color: "#f8fafc", fontSize: 12, fontWeight: "700" };
-var speedPopup = { position: "absolute", bottom: 28, right: 0, backgroundColor: "rgba(15,15,15,0.96)", borderRadius: 8, overflow: "hidden", zIndex: 40 };
+var speedPopup = { position: "absolute", bottom: 28, right: 0, minWidth: 72, backgroundColor: "rgba(15,15,15,0.96)", borderRadius: 8, overflow: "hidden", zIndex: 40 };
 var speedOpt = { paddingHorizontal: 16, paddingVertical: 8 };
 var speedOptActive = { backgroundColor: "rgba(56,189,248,0.15)" };
 var speedOptText = { color: "#f8fafc", fontSize: 13, fontWeight: "400" };

@@ -3,13 +3,14 @@
 /**
  * m3u8 广告过滤 — 移动端本地过滤链路
  * 下载 m3u8 → 解析 segment → 检测广告 → 删除广告段 → 展开绝对路径
+ *
+ * 即使不检测广告，也会将所有相对路径展开为绝对路径，
+ * 确保写入本地缓存后播放器能正确加载 .ts 片段。
  */
-
-// ─── 核心过滤逻辑（纯文本）──────────────────────────────────────
 
 /**
  * 对已下载的 m3u8 文本执行广告过滤，返回过滤后的纯文本。
- * 不传 detector 时不执行过滤，直接返回原文。
+ * 不传 detector 时仅展开相对路径，不删除任何 segment。
  *
  * @param {string} text - m3u8 playlist 原始文本
  * @param {string} baseUrl - 原始 m3u8 URL（用于解析相对路径和检测广告）
@@ -17,12 +18,10 @@
  * @returns {string|null} 过滤后的文本，无合法段时返回 null
  */
 export function filterSegmentsText(text, baseUrl, detector) {
-  if (!detector) return text;
-
   const { segments } = parseM3u8Segments(text);
   if (segments.length === 0) return null;
 
-  const adIndices = detector(segments, baseUrl);
+  const adIndices = detector ? detector(segments, baseUrl) : new Set();
   const result = generateCleanPlaylist(segments, adIndices, baseUrl);
 
   return result.clean;
@@ -31,7 +30,7 @@ export function filterSegmentsText(text, baseUrl, detector) {
 /**
  * 对 m3u8 URL 进行完整过滤（支持 Master Playlist 多层递归）
  *
- * 不传 detector 时直接返回原始内容，不执行任何过滤。
+ * 不传 detector 时仍会处理 Master/Media Playlist 解析和 URL 展开。
  *
  * @param {string} m3u8Url - m3u8 地址
  * @param {Function|null} [detector] - 自定义探测器，透传给 filterSegmentsText
@@ -41,11 +40,6 @@ export async function filterM3u8ByUrl(m3u8Url, detector) {
   const resp = await fetch(m3u8Url);
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const text = await resp.text();
-
-  // 未配置策略 → 原始内容直通
-  if (!detector) {
-    return { text };
-  }
 
   // 处理 Master Playlist（多码率）：取最高码率子流递归过滤
   if (text.includes("#EXT-X-STREAM-INF")) {
@@ -57,7 +51,7 @@ export async function filterM3u8ByUrl(m3u8Url, detector) {
     return await filterM3u8ByUrl(streams[0].url, detector);
   }
 
-  // 处理 Media Playlist（直接含 .ts 片段）
+  // 处理 Media Playlist：解析 segment → 可选去广告 → 展开相对路径
   const cleanText = filterSegmentsText(text, m3u8Url, detector);
   if (!cleanText) {
     return { text: null, error: "All segments filtered as ads or no valid segments" };

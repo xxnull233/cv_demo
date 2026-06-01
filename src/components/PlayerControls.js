@@ -28,6 +28,8 @@ export function PlayerControls({ player, title, onBack, style }) {
   const seekStartTime = useRef(0);
   const seekingRef = useRef(false);
   const opacityAnim = useRef(new Animated.Value(1)).current;
+  const gestureStartX = useRef(0);
+  const gestureSwiping = useRef(false);
 
   // ── 轮询播放状态和时间 ──
   useEffect(() => {
@@ -181,20 +183,65 @@ export function PlayerControls({ player, title, onBack, style }) {
 
   return (
     <View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, style]} pointerEvents="box-none">
-      {/* 点击区域 */}
-      <Pressable style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} onPress={handleTap} />
+      {/* 全屏触摸区域：点击 / 横向滑动 */}
+      <View
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={(e) => {
+          gestureStartX.current = e.nativeEvent.pageX;
+          gestureSwiping.current = false;
+        }}
+        onResponderMove={(e) => {
+          var x = e.nativeEvent.pageX;
+          var dx = x - gestureStartX.current;
+          if (!gestureSwiping.current && Math.abs(dx) > 10) {
+            gestureSwiping.current = true;
+            if (clickTimer.current) {
+              clearTimeout(clickTimer.current);
+              clickTimer.current = null;
+            }
+            setShowSpeed(false);
+            setSeeking(true);
+            setShowControls(true);
+            seekStartX.current = x;
+            seekStartTime.current = currentTime;
+            seekingRef.current = true;
+            setSeekTime(currentTime);
+          }
+          if (gestureSwiping.current && duration > 0) {
+            var ratio = Math.max(0, Math.min(1, dx / (barWidthRef.current || 300)));
+            setSeekTime(Math.max(0, Math.min(duration, seekStartTime.current + ratio * duration)));
+          }
+        }}
+        onResponderRelease={() => {
+          if (gestureSwiping.current) {
+            var target = seekTime;
+            seekingRef.current = false;
+            setSeeking(false);
+            setCurrentTime(target);
+            if (player) player.currentTime = target;
+          } else {
+            handleTap();
+          }
+        }}
+      />
 
       {/* 缓冲提示 */}
       {buffering && (
         <View style={bufferingContainer}>
-          <Text style={bufferingText}>{"正在缓冲..."}</Text>
+          <View style={bufferingInner}>
+            <Text style={bufferingText}>{"正在缓冲..."}</Text>
+          </View>
         </View>
       )}
 
       {/* 滑动时间浮层 */}
       {seeking && (
         <View style={seekOverlay}>
-          <Text style={seekOverlayText}>{fmt(seekTime)}/{fmt(duration)}</Text>
+          <View style={seekOverlayInner}>
+            <Text style={seekOverlayText}>{fmt(seekTime)}/{fmt(duration)}</Text>
+          </View>
         </View>
       )}
 
@@ -318,10 +365,12 @@ function fmt(sec) {
 }
 
 // ─── 样式 ───
-var bufferingContainer = { position: "absolute", top: "50%", left: "50%", transform: [{ translateX: "-50%" }, { translateY: "-50%" }], zIndex: 20, backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 18, paddingVertical: 8, borderRadius: 8 };
+var bufferingContainer = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", zIndex: 20, pointerEvents: "none" };
+var bufferingInner = { backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 18, paddingVertical: 8, borderRadius: 8 };
 var bufferingText = { color: "#f8fafc", fontSize: 16, fontWeight: "700" };
 
-var seekOverlay = { position: "absolute", top: "40%", left: "50%", transform: [{ translateX: "-50%" }, { translateY: "-50%" }], backgroundColor: "rgba(0,0,0,0.65)", paddingHorizontal: 18, paddingVertical: 6, borderRadius: 8, zIndex: 30 };
+var seekOverlay = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", zIndex: 30, pointerEvents: "none" };
+var seekOverlayInner = { backgroundColor: "rgba(0,0,0,0.65)", paddingHorizontal: 18, paddingVertical: 6, borderRadius: 8 };
 var seekOverlayText = { color: "#f8fafc", fontSize: 20, fontWeight: "700" };
 
 var topBar = { paddingTop: 8, paddingHorizontal: 12, paddingBottom: 14, flexDirection: "row", alignItems: "center" };

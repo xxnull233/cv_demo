@@ -276,22 +276,6 @@ export function PlayerScreen() {
     return null;
   }
 
-  // Web 端视频上方的浮层返回按钮
-  const webBackBtn = {
-    position: "absolute",
-    top: 8,
-    left: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "rgba(0,0,0,0.45)",
-  };
-  const webBackBtnText = {
-    color: "#f8fafc",
-    fontSize: 14,
-    fontWeight: "700",
-  };
-
   const episodeButtonWidth = useMemo(() => {
     const availableWidth = Math.max(
       0,
@@ -311,21 +295,17 @@ export function PlayerScreen() {
       <ExpoStatusBar style="light" backgroundColor="#050505" translucent={false} />
       <View style={styles.videoWrapper}>
         {isHlsOnWeb ? (
-          <View>
-            <HlsVideo
-              key={hlsRetryKey}
-              uri={getPlayerUrl(currentEpisode?.url)}
-              style={styles.video}
-              contentFit="contain"
-              onError={setHlsError}
-              onTimeUpdate={(t) => { hlsTimeRef.current = t; }}
-              onFirstFrameRender={() => {}}
-              initialTime={savedPlaybackTime.current}
-            />
-            <Pressable style={webBackBtn} onPress={handleBack}>
-              <Text style={webBackBtnText}>{"返回"}</Text>
-            </Pressable>
-          </View>
+          <HlsVideo
+            key={hlsRetryKey}
+            uri={getPlayerUrl(currentEpisode?.url)}
+            style={styles.video}
+            contentFit="contain"
+            onError={setHlsError}
+            onTimeUpdate={(t) => { hlsTimeRef.current = t; }}
+            onFirstFrameRender={() => {}}
+            onBack={handleBack}
+            initialTime={savedPlaybackTime.current}
+          />
         ) : filtering ? (
           <View style={styles.video}>
             <View style={styles.playerOverlay}>

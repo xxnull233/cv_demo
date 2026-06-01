@@ -80,7 +80,7 @@ export function PlayerView({
       <VideoView
         player={player}
         style={{ flex: 1 }}
-        nativeControls
+        nativeControls={false}
         contentFit="contain"
         onFirstFrameRender={handleFirstFrameRender}
       />

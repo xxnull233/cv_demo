@@ -1,231 +1,349 @@
 import { useEffect, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Animated, PanResponder, Pressable, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import * as ScreenOrientation from "expo-screen-orientation";
+import Svg, { Path } from "react-native-svg";
 
 /**
- * Bilibili 风格播放器控制覆盖层
- * 安全模式：不拦截触摸事件（依赖下方原生控件处理播放/暂停），
- * 仅渲染视觉覆盖层：顶部返回+标题、中心播放/暂停指示、底部进度条+时间
- *
- * Props:
- *   player    - VideoPlayer 实例
- *   title     - 视频标题
- *   onBack    - 返回回调
- *   style     - 覆盖层容器样式
+ * 播放器控制覆盖层 — 与 Web 端全功能同步
  */
 export function PlayerControls({ player, title, onBack, style }) {
+  // ── 状态 ──
   const [isPlaying, setIsPlaying] = useState(player?.playing ?? false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [barWidth, setBarWidth] = useState(0);
+  const [showControls, setShowControls] = useState(true);
+  const [showSpeed, setShowSpeed] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const [buffering, setBuffering] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [seeking, setSeeking] = useState(false);
+  const [seekTime, setSeekTime] = useState(0);
 
-  // 轮询播放状态和时间（避免 useEvent 在 v2.2.2 上不可靠）
+  const hideTimer = useRef(null);
+  const barWidthRef = useRef(0);
+  const lastClickRef = useRef(0);
+  const clickTimer = useRef(null);
+  const seekStartX = useRef(0);
+  const seekStartTime = useRef(0);
+  const seekingRef = useRef(false);
+  const opacityAnim = useRef(new Animated.Value(1)).current;
+
+  // ── 轮询播放状态和时间 ──
   useEffect(() => {
     if (!player) return;
     function tick() {
       try {
         setIsPlaying(player.playing);
-        setCurrentTime(player.currentTime || 0);
-        setDuration(player.duration || 0);
+        var t = player.currentTime || 0;
+        var d = player.duration || 0;
+        setCurrentTime(t);
+        setDuration(d);
       } catch {}
     }
     tick();
-    const interval = setInterval(tick, 250);
-    return () => clearInterval(interval);
+    var interval = setInterval(tick, 250);
+    return function () { clearInterval(interval); };
   }, [player]);
 
-  function handlePlayPause() {
+  // ── 监听系统全屏/方向变化 ──
+  useEffect(function () {
+    var listener = ScreenOrientation.addOrientationChangeListener(function (event) {
+      var isLandscape = event.orientationLock === ScreenOrientation.OrientationLock.LANDSCAPE ||
+                        event.orientationLock === ScreenOrientation.OrientationLock.LANDSCAPE_LEFT ||
+                        event.orientationLock === ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT;
+      setIsFullscreen(isLandscape);
+    });
+    return function () { ScreenOrientation.removeOrientationChangeListener(listener); };
+  }, []);
+
+  // ── 轮询缓冲状态 ──
+  useEffect(() => {
     if (!player) return;
-    if (player.playing) {
-      player.pause();
-    } else {
-      player.play();
+    function tick() {
+      try { setBuffering(player.status === "loading"); } catch {}
     }
+    var interval = setInterval(tick, 500);
+    return function () { clearInterval(interval); };
+  }, [player]);
+
+  // ── 自动隐藏 ──
+  useEffect(() => {
+    if (!isPlaying || ended) return;
+    if (!showControls) return;
+    clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(function () { fadeOut(); }, 5000);
+    return function () { clearTimeout(hideTimer.current); };
+  }, [showControls, isPlaying, currentTime]);
+
+  function fadeOut() {
+    Animated.timing(opacityAnim, { toValue: 0, duration: 400, useNativeDriver: true }).start(function () {
+      setShowControls(false);
+    });
+  }
+  function fadeIn() {
+    setShowControls(true);
+    Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
   }
 
-  function handleProgressLayout(event) {
-    setBarWidth(event.nativeEvent.layout.width);
+  // ── 播放/暂停 ──
+  function togglePlay() {
+    if (!player) return;
+    if (player.playing) { player.pause(); } else { player.play(); }
   }
 
-  function handleProgressTap(event) {
-    if (!duration || duration <= 0 || !barWidth) return;
-    const { locationX } = event.nativeEvent;
-    const ratio = Math.max(0, Math.min(1, locationX / barWidth));
+  // ── 单击/双击 ──
+  function handleTap() {
+    var now = Date.now();
+    var last = lastClickRef.current;
+    lastClickRef.current = now;
+    if (now - last < 350) {
+      if (clickTimer.current) clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+      togglePlay();
+      return;
+    }
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+    clickTimer.current = setTimeout(function () {
+      if (showControls) { fadeOut(); }
+      else { fadeIn(); }
+      clickTimer.current = null;
+    }, 350);
+  }
+
+  // ── 进度条 ──
+  function handleProgressLayout(e) { barWidthRef.current = e.nativeEvent.layout.width; }
+  function handleProgressTap(e) {
+    if (!duration || duration <= 0 || !barWidthRef.current) return;
+    var ratio = Math.max(0, Math.min(1, e.nativeEvent.locationX / barWidthRef.current));
     player.currentTime = ratio * duration;
   }
 
-  const progressRatio = duration > 0 ? currentTime / duration : 0;
-  const isEnded = duration > 0 && currentTime >= duration - 0.5;
+  // ── 滑动手势 ──
+  function handleSeekStart(x) {
+    if (!duration) return;
+    seekStartX.current = x;
+    seekStartTime.current = currentTime;
+    setShowSpeed(false);
+  }
+  function handleSeekMove(x) {
+    if (!barWidthRef.current) return;
+    var dx = x - seekStartX.current;
+    if (!seekingRef.current) {
+      if (Math.abs(dx) < 10) return;
+      seekingRef.current = true;
+      setSeekTime(seekStartTime.current);
+      if (clickTimer.current) clearTimeout(clickTimer.current);
+      setShowControls(true);
+      setSeeking(true);
+    }
+    var ratio = Math.max(0, Math.min(1, dx / barWidthRef.current));
+    setSeekTime(Math.max(0, Math.min(duration, seekStartTime.current + ratio * duration)));
+  }
+  function handleSeekEnd() {
+    if (!seekingRef.current) return;
+    var target = seekTime;
+    seekingRef.current = false;
+    setSeeking(false);
+    setCurrentTime(target);
+    if (player) player.currentTime = target;
+  }
+
+  // ── 圆点拖动（用 PanResponder）──
+  var dotPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: function () { return true; },
+      onPanResponderGrant: function (e) {
+        handleSeekStart(e.nativeEvent.pageX);
+      },
+      onPanResponderMove: function (e) {
+        handleSeekMove(e.nativeEvent.pageX);
+      },
+      onPanResponderRelease: function () {
+        handleSeekEnd();
+      },
+    })
+  ).current;
+
+
+
+  // ── 倍速 ──
+  var SPEEDS = [1, 1.25, 1.5, 2];
+  function selectSpeed(val) {
+    setSpeed(val);
+    try { player.playbackRate = val; } catch {}
+    setShowSpeed(false);
+  }
+
+  var progressRatio = duration > 0 ? (seeking ? seekTime / duration : currentTime / duration) : 0;
+  var ended = duration > 0 && currentTime >= duration - 0.5;
+  var displayPct = (progressRatio * 100).toFixed(1);
 
   return (
-    <View style={[style, containerStyle]} pointerEvents="box-none">
-      {/* 顶部条 */}
-      <View style={topBarStyle} pointerEvents="box-none">
-        <Pressable style={backBtnStyle} onPress={onBack}>
-          <Text style={backBtnTextStyle}>{"← 返回"}</Text>
-        </Pressable>
-        <Text style={titleStyle} numberOfLines={1}>
-          {title}
-        </Text>
-        <View style={{ width: 60 }} />
-      </View>
+    <View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, style]} pointerEvents="box-none">
+      {/* 点击区域 */}
+      <Pressable style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} onPress={handleTap} />
 
-      {/* 中心播放/重播按钮 */}
-      {(!isPlaying || isEnded) && (
-        <Pressable style={centerBtnStyle} onPress={handlePlayPause}>
-          <Text style={centerBtnTextStyle}>{isEnded ? "↻" : "▶"}</Text>
-        </Pressable>
+      {/* 缓冲提示 */}
+      {buffering && (
+        <View style={bufferingContainer}>
+          <Text style={bufferingText}>{"正在缓冲..."}</Text>
+        </View>
       )}
 
-      {/* 底部控制栏 */}
-      <View style={bottomBarStyle} pointerEvents="box-none">
-        <Pressable
-          style={progressBarOuterStyle}
-          onLayout={handleProgressLayout}
-          onPress={handleProgressTap}
-        >
-          <View style={progressTrackStyle}>
-            <View
-              style={[progressFillStyle, { width: (progressRatio * 100) + "%" }]}
-            />
-          </View>
-        </Pressable>
-        <View style={controlsRowStyle}>
-          <Pressable style={ctrlBtnStyle} onPress={handlePlayPause}>
-            <Text style={ctrlBtnTextStyle}>{isPlaying ? "⏸" : "▶"}</Text>
-          </Pressable>
-          <Text style={timeTextStyle}>
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </Text>
+      {/* 滑动时间浮层 */}
+      {seeking && (
+        <View style={seekOverlay}>
+          <Text style={seekOverlayText}>{fmt(seekTime)}/{fmt(duration)}</Text>
         </View>
-      </View>
+      )}
+
+      {/* 控件覆盖层 */}
+      <Animated.View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: opacityAnim, zIndex: 10 }, showControls ? {} : { display: "none" }]} pointerEvents="box-none">
+        {/* 顶部栏 */}
+        <LinearGradient colors={["rgba(0,0,0,0.5)", "transparent"]} style={topBar}>
+          <Pressable style={backBtn} onPress={onBack}>
+            <Svg width="24" height="24" viewBox="0 0 24 24" fill="#f8fafc">
+              <Path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+            </Svg>
+          </Pressable>
+          <Text style={topTitle} numberOfLines={1}>{title}</Text>
+          <View style={{ width: 60 }} />
+        </LinearGradient>
+
+        {/* 底部栏 */}
+        <LinearGradient colors={["transparent", "rgba(0,0,0,0.5)"]} style={bottomBar}>
+          <View style={ctrlRow}>
+            <Pressable onPress={togglePlay} style={iconBtn}>
+              {isPlaying ? (
+                <Svg width="24" height="24" viewBox="0 0 24 24" fill="#f8fafc">
+                  <Path d="M6 4h4v16H6zM14 4h4v16h-4z"/>
+                </Svg>
+              ) : (
+                <Svg width="24" height="24" viewBox="0 0 24 24" fill="#f8fafc">
+                  <Path d="M8 5v14l11-7z"/>
+                </Svg>
+              )}
+            </Pressable>
+
+            {/* 进度条 */}
+            <View style={progWrap}>
+              <View
+                style={progTrack}
+                onLayout={handleProgressLayout}
+                onStartShouldSetResponder={function () { return true; }}
+                onResponderGrant={function (e) { handleSeekStart(e.nativeEvent.pageX); }}
+                onResponderMove={function (e) { handleSeekMove(e.nativeEvent.pageX); }}
+                onResponderRelease={function () { handleSeekEnd(); }}
+              >
+                <View style={[progFill, { width: displayPct + "%" }]} />
+                <View
+                  style={[progDot, { left: displayPct + "%" }]}
+                  {...dotPan.panHandlers}
+                />
+              </View>
+            </View>
+
+            {/* 时间 */}
+            <Text style={timeText}>{fmt(currentTime)}/{fmt(duration)}</Text>
+
+            {/* 倍速 */}
+            <View style={{ position: "relative" }}>
+              <Pressable onPress={function () { setShowSpeed(function (v) { return !v; }); }} style={speedBtn}>
+                <Text style={speedBtnText}>{speed}x</Text>
+              </Pressable>
+              {showSpeed && (
+                <View style={speedPopup}>
+                  {SPEEDS.map(function (s) {
+                    var a = s === speed;
+                    return (
+                      <Pressable key={s} onPress={function () { selectSpeed(s); }} style={[speedOpt, a && speedOptActive]}>
+                        <Text style={[speedOptText, a && speedOptTextActive]}>{s}x</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+
+            {/* 全屏：非全屏时显示两个入口，全屏时显示一个出口 */}
+            {isFullscreen ? (
+              <Pressable onPress={function () {
+                ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
+                setIsFullscreen(false);
+              }} style={iconBtn}>
+                <Svg width="20" height="20" viewBox="0 0 24 24" fill="#f8fafc">
+                  <Path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                </Svg>
+              </Pressable>
+            ) : (
+              <>
+                <Pressable onPress={function () {
+                  ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(function () {});
+                  setIsFullscreen(true);
+                }} style={iconBtn}>
+                  <Svg width="20" height="20" viewBox="0 0 24 24" fill="#f8fafc">
+                    <Path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                  </Svg>
+                </Pressable>
+                <Pressable onPress={function () {
+                  ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
+                  setIsFullscreen(false);
+                }} style={iconBtn}>
+                  <Svg width="20" height="20" viewBox="0 0 24 24" fill="#f8fafc">
+                    <Path d="M10 16h-2v2h2v-2zm-4-2H4v2h2v-2zm14-4h-2v2h2v-2z"/>
+                  </Svg>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </LinearGradient>
+      </Animated.View>
+
+      {/* 隐藏时的底部细进度条 */}
+      {!showControls && (
+        <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 3, zIndex: 5 }}>
+          <View style={{ height: "100%", width: displayPct + "%", backgroundColor: "#38bdf8" }} />
+        </View>
+      )}
     </View>
   );
 }
 
-function formatTime(seconds) {
-  if (!seconds || isNaN(seconds)) return "00:00";
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) {
-    return (
-      String(h).padStart(2, "0") +
-      ":" + String(m).padStart(2, "0") +
-      ":" + String(s).padStart(2, "0")
-    );
-  }
-  return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+function fmt(sec) {
+  if (!sec || isNaN(sec)) return "0:00";
+  var m = Math.floor(sec / 60);
+  var s = Math.floor(sec % 60);
+  return m + ":" + (s < 10 ? "0" + s : String(s));
 }
 
-// ─── 内联样式 ───
+// ─── 样式 ───
+var bufferingContainer = { position: "absolute", top: "50%", left: "50%", transform: [{ translateX: "-50%" }, { translateY: "-50%" }], zIndex: 20, backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 18, paddingVertical: 8, borderRadius: 8 };
+var bufferingText = { color: "#f8fafc", fontSize: 16, fontWeight: "700" };
 
-const containerStyle = {
-  position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-};
+var seekOverlay = { position: "absolute", top: "40%", left: "50%", transform: [{ translateX: "-50%" }, { translateY: "-50%" }], backgroundColor: "rgba(0,0,0,0.65)", paddingHorizontal: 18, paddingVertical: 6, borderRadius: 8, zIndex: 30 };
+var seekOverlayText = { color: "#f8fafc", fontSize: 20, fontWeight: "700" };
 
-const topBarStyle = {
-  position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  flexDirection: "row",
-  alignItems: "center",
-  paddingTop: 8,
-  paddingHorizontal: 12,
-  paddingBottom: 10,
-  backgroundColor: "rgba(0,0,0,0.35)",
-};
+var topBar = { paddingTop: 8, paddingHorizontal: 12, paddingBottom: 14, flexDirection: "row", alignItems: "center" };
+var backBtn = { paddingVertical: 6, paddingRight: 8 };
+var topTitle = { flex: 1, color: "#f8fafc", fontSize: 15, fontWeight: "700" };
 
-const backBtnStyle = {
-  paddingVertical: 6,
-  paddingRight: 12,
-};
+var bottomBar = { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10 };
+var ctrlRow = { flexDirection: "row", alignItems: "center", gap: 8 };
 
-const backBtnTextStyle = {
-  color: "#f8fafc",
-  fontSize: 15,
-  fontWeight: "700",
-};
+var iconBtn = { padding: 4 };
 
-const titleStyle = {
-  flex: 1,
-  color: "#f8fafc",
-  fontSize: 15,
-  fontWeight: "700",
-};
+var progWrap = { flex: 1 };
+var progTrack = { height: 6, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 3, position: "relative", justifyContent: "center" };
+var progFill = { height: "100%", backgroundColor: "#38bdf8", borderRadius: 2 };
+var progDot = { position: "absolute", top: "50%", width: 14, height: 14, borderRadius: 7, backgroundColor: "#38bdf8", transform: [{ translateX: -7 }, { translateY: -7 }] };
 
-const centerBtnStyle = {
-  position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  justifyContent: "center",
-  alignItems: "center",
-};
+var timeText = { color: "#9ca3af", fontSize: 11, fontWeight: "600", letterSpacing: -0.3 };
 
-const centerBtnTextStyle = {
-  color: "#f8fafc",
-  fontSize: 52,
-  fontWeight: "700",
-  textShadowColor: "rgba(0,0,0,0.5)",
-  textShadowOffset: { width: 0, height: 2 },
-  textShadowRadius: 8,
-};
-
-const bottomBarStyle = {
-  position: "absolute",
-  bottom: 0,
-  left: 0,
-  right: 0,
-  paddingHorizontal: 12,
-  paddingTop: 6,
-  paddingBottom: 10,
-  backgroundColor: "rgba(0,0,0,0.45)",
-};
-
-const progressBarOuterStyle = {
-  paddingVertical: 8,
-};
-
-const progressTrackStyle = {
-  height: 3,
-  backgroundColor: "rgba(255,255,255,0.25)",
-  borderRadius: 2,
-  overflow: "hidden",
-};
-
-const progressFillStyle = {
-  height: "100%",
-  backgroundColor: "#38bdf8",
-  borderRadius: 2,
-};
-
-const controlsRowStyle = {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 12,
-};
-
-const ctrlBtnStyle = {
-  paddingVertical: 4,
-  paddingHorizontal: 4,
-};
-
-const ctrlBtnTextStyle = {
-  color: "#f8fafc",
-  fontSize: 18,
-  fontWeight: "700",
-};
-
-const timeTextStyle = {
-  color: "#d4d4d4",
-  fontSize: 12,
-  fontWeight: "600",
-  flex: 1,
-  textAlign: "center",
-};
+var speedBtn = { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.08)" };
+var speedBtnText = { color: "#f8fafc", fontSize: 12, fontWeight: "700" };
+var speedPopup = { position: "absolute", bottom: 28, right: 0, backgroundColor: "rgba(15,15,15,0.96)", borderRadius: 8, overflow: "hidden", zIndex: 40 };
+var speedOpt = { paddingHorizontal: 16, paddingVertical: 8 };
+var speedOptActive = { backgroundColor: "rgba(56,189,248,0.15)" };
+var speedOptText = { color: "#f8fafc", fontSize: 13, fontWeight: "400" };
+var speedOptTextActive = { color: "#38bdf8", fontWeight: "700" };

@@ -10,6 +10,7 @@ import { RootNavigator } from "./src/navigation/RootNavigator";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
+import { TOAST_CONFIG } from "./src/constants/app";
 
 // App 启动时清理残留的 hls 过滤缓存文件（防止闪退/强杀后残留）
 async function cleanupHlsCache() {
@@ -51,7 +52,7 @@ export default function App() {
       <RootNavigator />
     </AppProviders>
     </ErrorBoundary>
-    <Toast />
+    <Toast config={TOAST_CONFIG} />
     </SafeAreaProvider>
   );
 }

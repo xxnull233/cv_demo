@@ -15,6 +15,7 @@ import { useNavigation } from "@react-navigation/native";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import * as Clipboard from "expo-clipboard";
 import { STRATEGY_OPTIONS } from "../utils/m3u8Strategies";
+import { TOAST_CONFIG } from "../constants/app";
 import { useSources } from "../context/SourceContext";
 
 const EMPTY_FORM = { name: "", api: "", excludeClass: "" };
@@ -124,7 +125,7 @@ export function SettingsScreen() {
       var count = await importFromUrl(url);
       showToast("成功导入 " + count + " 个源", "success");
       setImportUrl("");
-      setShowImportUrl(false);
+      setTimeout(function () { setShowImportUrl(false); }, 1200);
     } catch (e) {
       showToast("导入失败: " + e.message, "error");
     } finally {
@@ -139,7 +140,7 @@ export function SettingsScreen() {
       var count = await importFromJson(json);
       showToast("成功导入 " + count + " 个源", "success");
       setImportJson("");
-      setShowImportJson(false);
+      setTimeout(function () { setShowImportJson(false); }, 1200);
     } catch (e) {
       showToast("导入失败: " + e.message, "error");
     }
@@ -419,6 +420,7 @@ export function SettingsScreen() {
               </>
             )}
           </Pressable>
+          <Toast config={TOAST_CONFIG} />
         </Pressable>
       </Modal>
     </SafeAreaView>

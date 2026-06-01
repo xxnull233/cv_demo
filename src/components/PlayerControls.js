@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, PanResponder, Pressable, Text, View } from "react-native";
+import { Animated, PanResponder, Pressable, StatusBar, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ScreenOrientation from "expo-screen-orientation";
 import Svg, { Path } from "react-native-svg";
@@ -31,6 +31,7 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
   const gestureStartX = useRef(0);
   const gestureSwiping = useRef(false);
   const seekTimeRef = useRef(0);
+  const fullscreenModeRef = useRef("normal");
   const currentTimeRef = useRef(0);
   const durationRef = useRef(0);
   const playerRef = useRef(player);
@@ -56,15 +57,10 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
 
   useEffect(() => { playerRef.current = player; }, [player]);
 
-  // ── 监听系统全屏/方向变化（物理旋转时自动切换，手动锁定时不触发）──
+  // ── 挂载时锁定竖屏，脱离时解锁 —— 不跟随系统自动旋转 ──
   useEffect(function () {
-    var listener = ScreenOrientation.addOrientationChangeListener(function (event) {
-      var isLandscape = event.orientationLock === ScreenOrientation.OrientationLock.LANDSCAPE ||
-                        event.orientationLock === ScreenOrientation.OrientationLock.LANDSCAPE_LEFT ||
-                        event.orientationLock === ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT;
-      setFullscreenMode(isLandscape ? "landscape" : "normal");
-    });
-    return function () { ScreenOrientation.removeOrientationChangeListener(listener); };
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
+    return function () { ScreenOrientation.unlockAsync().catch(function () {}); };
   }, []);
 
   // ── 轮询缓冲状态 ──
@@ -124,21 +120,27 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
   // ── 全屏切换 ──
   function enterPortraitFS() {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
+    StatusBar.setHidden(true);
     setFullscreenMode("portrait");
+    fullscreenModeRef.current = "portrait";
     onFullscreenChange?.(true);
   }
   function enterLandscapeFS() {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(function () {});
+    StatusBar.setHidden(true);
     setFullscreenMode("landscape");
+    fullscreenModeRef.current = "landscape";
     onFullscreenChange?.(true);
   }
   function exitFS() {
     ScreenOrientation.unlockAsync().catch(function () {});
+    StatusBar.setHidden(false);
     setFullscreenMode("normal");
+    fullscreenModeRef.current = "normal";
     onFullscreenChange?.(false);
   }
   function handleBackPress() {
-    if (fullscreenMode !== "normal") {
+    if (fullscreenModeRef.current !== "normal") {
       exitFS();
     } else {
       onBack();
@@ -217,33 +219,32 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
 
   return (
     <View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, style]} pointerEvents="box-none">
-      {/* 全屏触摸区域：点击 / 横向滑动 */}
+      {/* 点击处理 —— Pressable，不争夺子元素触摸 */}
+      <Pressable
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+        onPress={handleTap}
+      />
+      {/* 滑动处理 —— 仅在移动时认领手势 */}
       <View
         style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-        onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => true}
+        onStartShouldSetResponder={() => false}
+        onMoveShouldSetResponder={(e) => {
+          return Math.abs(e.nativeEvent.pageX - gestureStartX.current) > 5;
+        }}
         onResponderGrant={(e) => {
-          gestureStartX.current = e.nativeEvent.pageX;
-          gestureSwiping.current = false;
+          gestureSwiping.current = true;
+          setShowSpeed(false);
+          setSeeking(true);
+          setShowControls(true);
+          seekStartX.current = e.nativeEvent.pageX;
+          seekStartTime.current = currentTime;
+          seekingRef.current = true;
+          setSeekTime(currentTime);
         }}
         onResponderMove={(e) => {
           var x = e.nativeEvent.pageX;
-          var dx = x - gestureStartX.current;
-          if (!gestureSwiping.current && Math.abs(dx) > 10) {
-            gestureSwiping.current = true;
-            if (clickTimer.current) {
-              clearTimeout(clickTimer.current);
-              clickTimer.current = null;
-            }
-            setShowSpeed(false);
-            setSeeking(true);
-            setShowControls(true);
-            seekStartX.current = x;
-            seekStartTime.current = currentTime;
-            seekingRef.current = true;
-            setSeekTime(currentTime);
-          }
-          if (gestureSwiping.current && duration > 0) {
+          var dx = x - seekStartX.current;
+          if (duration > 0) {
             var ratio = dx / (barWidthRef.current || 300);
             var computed = Math.max(0, Math.min(duration, seekStartTime.current + ratio * duration));
             setSeekTime(computed);
@@ -251,15 +252,14 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
           }
         }}
         onResponderRelease={() => {
-          if (gestureSwiping.current) {
-            var target = seekTimeRef.current;
-            seekingRef.current = false;
-            setSeeking(false);
-            setCurrentTime(target);
-            if (player) player.currentTime = target;
-          } else {
-            handleTap();
-          }
+          var target = seekTimeRef.current;
+          seekingRef.current = false;
+          setSeeking(false);
+          setCurrentTime(target);
+          if (player) player.currentTime = target;
+        }}
+        onTouchStart={(e) => {
+          gestureStartX.current = e.nativeEvent.pageX;
         }}
       />
 
@@ -374,8 +374,8 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
         </LinearGradient>
       </Animated.View>
 
-      {/* 隐藏时的底部细进度条 */}
-      {!showControls && (
+      {/* 隐藏时的底部细进度条（仅普通模式显示） */}
+      {!showControls && fullscreenMode === "normal" && (
         <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 3, zIndex: 5 }}>
           <View style={{ height: "100%", width: displayPct + "%", backgroundColor: "#38bdf8" }} />
         </View>
@@ -392,9 +392,9 @@ function fmt(sec) {
 }
 
 // ─── 样式 ───
-var bufferingContainer = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", zIndex: 20, pointerEvents: "none" };
-var bufferingInner = { backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 18, paddingVertical: 8, borderRadius: 8 };
-var bufferingText = { color: "#f8fafc", fontSize: 16, fontWeight: "700" };
+var bufferingContainer = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", zIndex: 30, pointerEvents: "none" };
+var bufferingInner = { backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 18, paddingVertical: 6, borderRadius: 8 };
+var bufferingText = { color: "#f8fafc", fontSize: 20, fontWeight: "700" };
 
 var seekOverlay = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", zIndex: 30, pointerEvents: "none" };
 var seekOverlayInner = { backgroundColor: "rgba(0,0,0,0.65)", paddingHorizontal: 18, paddingVertical: 6, borderRadius: 8 };

@@ -294,7 +294,7 @@ export function PlayerScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ExpoStatusBar style="light" backgroundColor="#050505" translucent={false} />
-      <View style={styles.videoWrapper}>
+      <View style={[styles.videoWrapper, pageFullscreen && { flex: 1 }]}>
         {isHlsOnWeb ? (
           <HlsVideo
             key={hlsRetryKey}
@@ -320,7 +320,7 @@ export function PlayerScreen() {
           <PlayerView
             key={`mobile-${mobileRetryKey}-${currentEpisode?.url || index}`}
             uri={filteredUri}
-            style={styles.video}
+            style={[styles.video, pageFullscreen && { aspectRatio: undefined, flex: 1 }]}
             title={currentDetail?.title}
             onBack={handleBack}
             initialTime={savedPlaybackTime.current}

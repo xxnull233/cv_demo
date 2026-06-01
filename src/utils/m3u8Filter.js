@@ -37,7 +37,14 @@ export function filterSegmentsText(text, baseUrl, detector) {
  * @returns {Promise<{ text: string|null, error?: string }>}
  */
 export async function filterM3u8ByUrl(m3u8Url, detector) {
-  const resp = await fetch(m3u8Url);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(function () { controller.abort(); }, 15000);
+  let resp;
+  try {
+    resp = await fetch(m3u8Url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const text = await resp.text();
 

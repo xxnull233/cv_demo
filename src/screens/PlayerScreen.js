@@ -5,6 +5,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StatusBar,
   Text,
   useWindowDimensions,
   View
@@ -25,6 +26,7 @@ import { styles as sharedStyles } from "../styles/shared";
 import { HlsVideo } from "../components/HlsVideo";
 import { PlayerView } from "../components/PlayerView";
 import { cacheDirectory, writeAsStringAsync, deleteAsync } from "expo-file-system";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { filterM3u8ByUrl } from "../utils/m3u8Filter";
 import { getDetectorForSource } from "../utils/m3u8Strategies";
 import { PROXY_BASE } from "../constants/app";
@@ -49,9 +51,8 @@ const PROGRESS_SAVE_THRESHOLD = 10;
 const M3U8_FILTER_CACHE_TTL = 30 * 60 * 1000;
 const m3u8FilterCache = new Map();
 function getM3u8CacheKey(url) {
-  // 取到最后一个 / 之前的部分作为缓存 key，相同路径的剧集复用
-  const idx = url.lastIndexOf('/');
-  return idx > 0 ? url.substring(0, idx) : url;
+  // 用完整 URL 作为缓存 key，不同文件不共享
+  return url;
 }
 function getCachedFilter(url) {
   const key = getM3u8CacheKey(url);
@@ -109,7 +110,6 @@ export function PlayerScreen() {
   const [mobileRetryKey, setMobileRetryKey] = useState(0);
   const [mobileError, setMobileError] = useState(false);
   const [fullscreenMode, setFullscreenMode] = useState("normal"); // "normal" | "portrait" | "landscape"
-  const isFullscreen = fullscreenMode !== "normal";
   const mobileFileRef = useRef(null); // 缓存文件路径 (string)
   const mobileTimeRef = useRef(0); // PlayerView 定期同步 currentTime 到此 ref
   const lastSavedTimeRef = useRef(0); // 上次保存的播放时间，用于脏检查
@@ -241,6 +241,15 @@ export function PlayerScreen() {
     isHlsOnWeb
   ]);
 
+  // ── 挂载时锁定竖屏，脱离时解锁 —— 不跟随系统自动旋转 ──
+  useEffect(function () {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
+    return function () {
+      ScreenOrientation.unlockAsync().catch(function () {});
+      StatusBar.setHidden(false);
+    };
+  }, []);
+
   function handleRetry() {
     if (isHlsOnWeb) {
       setHlsError(false);
@@ -274,6 +283,39 @@ export function PlayerScreen() {
     navigation.goBack();
   }
 
+  // ── 全屏管理 ──
+  function enterFullscreen(mode) {
+    if (mode === "landscape") {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(function () {});
+    } else {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
+    }
+    StatusBar.setHidden(true);
+    setFullscreenMode(mode);
+  }
+
+  function exitFullscreen() {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
+    StatusBar.setHidden(false);
+    setFullscreenMode("normal");
+  }
+
+  function handleFullscreenToggle() {
+    if (fullscreenMode !== "normal") {
+      exitFullscreen();
+    } else {
+      enterFullscreen("landscape");
+    }
+  }
+
+  function handleBackPress() {
+    if (fullscreenMode !== "normal") {
+      exitFullscreen();
+    } else {
+      handleBack();
+    }
+  }
+
   if (!currentDetail) {
     return null;
   }
@@ -293,7 +335,7 @@ export function PlayerScreen() {
   }, [windowWidth]);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={fullscreenMode === "landscape" ? [] : undefined}>
+    <SafeAreaView style={styles.safeArea} edges={fullscreenMode !== "normal" ? [] : undefined}>
       <ExpoStatusBar style="light" backgroundColor="#050505" translucent={false} />
       <View style={[styles.videoWrapper, fullscreenMode !== "normal" && { flex: 1 }]}>
         {isHlsOnWeb ? (
@@ -319,16 +361,17 @@ export function PlayerScreen() {
           </View>
         ) : (
           <PlayerView
-            key={`mobile-${mobileRetryKey}-${currentEpisode?.url || index}`}
+            key={`mobile-${mobileRetryKey}-${currentEpisode?.url || 'unknown'}`}
             uri={filteredUri}
             style={[styles.video, fullscreenMode !== "normal" && { aspectRatio: undefined, flex: 1 }]}
             title={currentDetail?.title}
-            onBack={handleBack}
+            onBack={handleBackPress}
+            fullscreenMode={fullscreenMode}
+            onFullscreenToggle={handleFullscreenToggle}
             contentFit="contain"
             initialTime={savedPlaybackTime.current}
             onTimeUpdate={(t) => { mobileTimeRef.current = t; }}
             onError={setMobileError}
-            onFullscreenChange={setFullscreenMode}
           />
         )}
 

@@ -100,16 +100,22 @@ export async function clearHistory() {
   await AsyncStorage.removeItem(HISTORY_KEY);
 }
 
+// 写串行队列：防止快速切换剧集时 read-modify-write 竞态
+var _progressWriteQueue = Promise.resolve();
+
 export async function updateHistoryProgress(id, sourceKey, progress) {
-  const history = await loadHistory();
-  const next = history.map((entry) => {
-    if (entry.sourceKey === sourceKey && entry.id === id) {
-      return { ...entry, ...progress, watchedAt: Date.now() };
-    }
-    return entry;
+  _progressWriteQueue = _progressWriteQueue.then(async function () {
+    const history = await loadHistory();
+    const next = history.map((entry) => {
+      if (entry.sourceKey === sourceKey && entry.id === id) {
+        return { ...entry, ...progress, watchedAt: Date.now() };
+      }
+      return entry;
+    });
+    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+    return next;
   });
-  await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-  return next;
+  return _progressWriteQueue;
 }
 const FAVORITES_KEY = "cv.mobile.favorites";
 const LAST_FAVORITE_FOLDER_KEY = "cv.mobile.lastFavoriteFolder";

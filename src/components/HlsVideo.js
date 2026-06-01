@@ -52,15 +52,25 @@ export function HlsVideo({
       hls.on(Hls.Events.ERROR, (_e, d) => { if (d.fatal) onError?.(true); });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = uri;
-      if (initialTime > 0) {
-        video.addEventListener("loadedmetadata", () => { video.currentTime = initialTime; video.play(); }, { once: true });
-      } else { video.play(); }
+      video.addEventListener("loadedmetadata", () => { video.play(); }, { once: true });
     }
     return () => {
       if (hls) { hls.destroy(); hlsRef.current = null; }
       else { video.removeAttribute("src"); video.load(); }
     };
   }, [uri]);
+
+  // 当 initialTime prop 变化时 seek（修复闭包冻结：[uri] effect 捕获了旧值）
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || initialTime <= 0) return;
+    if (video.readyState >= 1) {
+      video.currentTime = initialTime;
+    } else {
+      var seekOnce = function () { video.currentTime = initialTime; };
+      video.addEventListener("loadedmetadata", seekOnce, { once: true });
+    }
+  }, [initialTime]);
 
   useEffect(() => {
     const v = videoRef.current;

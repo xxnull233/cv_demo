@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, PanResponder, Pressable, StatusBar, Text, View } from "react-native";
+import { Animated, PanResponder, Pressable, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import * as ScreenOrientation from "expo-screen-orientation";
 import Svg, { Path } from "react-native-svg";
 
 /**
  * 播放器控制覆盖层 — 与 Web 端全功能同步
  */
-export function PlayerControls({ player, title, onBack, style, onFullscreenChange }) {
+export function PlayerControls({ player, title, onBack, style, fullscreenMode, onFullscreenToggle }) {
   // ── 状态 ──
   const [isPlaying, setIsPlaying] = useState(player?.playing ?? false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -16,7 +15,6 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
   const [showSpeed, setShowSpeed] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [buffering, setBuffering] = useState(false);
-  const [fullscreenMode, setFullscreenMode] = useState("normal");
   const [seeking, setSeeking] = useState(false);
   const [seekTime, setSeekTime] = useState(0);
 
@@ -31,10 +29,10 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
   const gestureStartX = useRef(0);
   const gestureSwiping = useRef(false);
   const seekTimeRef = useRef(0);
-  const fullscreenModeRef = useRef("normal");
   const currentTimeRef = useRef(0);
   const durationRef = useRef(0);
   const playerRef = useRef(player);
+  const shouldHideRef = useRef(true);
 
   // ── 轮询播放状态和时间 ──
   useEffect(() => {
@@ -57,12 +55,6 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
 
   useEffect(() => { playerRef.current = player; }, [player]);
 
-  // ── 挂载时锁定竖屏，脱离时解锁 —— 不跟随系统自动旋转 ──
-  useEffect(function () {
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
-    return function () { ScreenOrientation.unlockAsync().catch(function () {}); };
-  }, []);
-
   // ── 缓冲状态 —— 使用 addListener ──
   useEffect(() => {
     if (!player) return;
@@ -75,19 +67,24 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
 
   // ── 自动隐藏 ──
   useEffect(() => {
+    const ended = duration > 0 && currentTime >= duration - 0.5;
     if (!isPlaying || ended) return;
     if (!showControls) return;
     clearTimeout(hideTimer.current);
     hideTimer.current = setTimeout(function () { fadeOut(); }, 5000);
     return function () { clearTimeout(hideTimer.current); };
-  }, [showControls, isPlaying, currentTime]);
+  }, [showControls, isPlaying, currentTime, duration]);
 
   function fadeOut() {
+    shouldHideRef.current = true;
     Animated.timing(opacityAnim, { toValue: 0, duration: 400, useNativeDriver: true }).start(function () {
-      setShowControls(false);
+      if (shouldHideRef.current) {
+        setShowControls(false);
+      }
     });
   }
   function fadeIn() {
+    shouldHideRef.current = false;
     setShowControls(true);
     Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
   }
@@ -117,34 +114,8 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
     }, 200);
   }
 
-  // ── 全屏切换 ──
-  function enterPortraitFS() {
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
-    StatusBar.setHidden(true);
-    setFullscreenMode("portrait");
-    fullscreenModeRef.current = "portrait";
-    onFullscreenChange?.("portrait");
-  }
-  function enterLandscapeFS() {
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(function () {});
-    StatusBar.setHidden(true);
-    setFullscreenMode("landscape");
-    fullscreenModeRef.current = "landscape";
-    onFullscreenChange?.("landscape");
-  }
-  function exitFS() {
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
-    StatusBar.setHidden(false);
-    setFullscreenMode("normal");
-    fullscreenModeRef.current = "normal";
-    onFullscreenChange?.("normal");
-  }
   function handleBackPress() {
-    if (fullscreenModeRef.current !== "normal") {
-      exitFS();
-    } else {
-      onBack();
-    }
+    onBack();
   }
 
   // ── 进度条 ──
@@ -153,6 +124,8 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
     if (!duration || duration <= 0 || !barWidthRef.current) return;
     var ratio = Math.max(0, Math.min(1, e.nativeEvent.locationX / barWidthRef.current));
     player.currentTime = ratio * duration;
+    clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(function () { fadeOut(); }, 5000);
   }
 
   // ── 滑动手势 ──
@@ -214,7 +187,6 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
   }
 
   var progressRatio = duration > 0 ? (seeking ? seekTime / duration : currentTime / duration) : 0;
-  var ended = duration > 0 && currentTime >= duration - 0.5;
   var displayPct = (progressRatio * 100).toFixed(1);
 
   return (
@@ -241,13 +213,13 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
             setSeeking(true);
             setShowControls(true);
             seekStartX.current = x;
-            seekStartTime.current = currentTime;
+            seekStartTime.current = currentTimeRef.current;
             seekingRef.current = true;
-            setSeekTime(currentTime);
+            setSeekTime(currentTimeRef.current);
           }
-          if (gestureSwiping.current && duration > 0) {
+          if (gestureSwiping.current && durationRef.current > 0) {
             var ratio = dx / (barWidthRef.current || 300);
-            var computed = Math.max(0, Math.min(duration, seekStartTime.current + ratio * duration));
+            var computed = Math.max(0, Math.min(durationRef.current, seekStartTime.current + ratio * durationRef.current));
             setSeekTime(computed);
             seekTimeRef.current = computed;
           }
@@ -258,7 +230,7 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
             seekingRef.current = false;
             setSeeking(false);
             setCurrentTime(target);
-            if (player) player.currentTime = target;
+            if (playerRef.current) playerRef.current.currentTime = target;
           } else {
             handleTap();
           }
@@ -351,21 +323,16 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
               )}
             </View>
 
-            {/* 全屏入口按钮（仅普通模式显示，全屏时通过返回按钮退出） */}
-            {fullscreenMode === "normal" && (
-              <>
-                <Pressable onPress={enterPortraitFS} style={iconBtn}>
-                  <Svg width="20" height="20" viewBox="0 -960 960 960" fill="#f8fafc">
-                    <Path d="M200-680v-120q0-33 23.5-56.5T280-880h120v80H280v120h-80Zm80 600q-33 0-56.5-23.5T200-160v-120h80v120h120v80H280Zm400-600v-120H560v-80h120q33 0 56.5 23.5T760-800v120h-80ZM560-80v-80h120v-120h80v120q0 33-23.5 56.5T680-80H560Z"/>
-                  </Svg>
-                </Pressable>
-                <Pressable onPress={enterLandscapeFS} style={iconBtn}>
-                  <Svg width="20" height="20" viewBox="0 -960 960 960" fill="#f8fafc">
-                    <Path d="M800-560v-120H680v-80h120q33 0 56.5 23.5T880-680v120h-80Zm-720 0v-120q0-33 23.5-56.5T160-760h120v80H160v120H80Zm600 360v-80h120v-120h80v120q0 33-23.5 56.5T800-200H680Zm-520 0q-33 0-56.5-23.5T80-280v-120h80v120h120v80H160Z"/>
-                  </Svg>
-                </Pressable>
-              </>
-            )}
+            {/* 全屏切换按钮（普通模式→全屏，全屏模式下→退出） */}
+            <Pressable onPress={onFullscreenToggle} style={iconBtn}>
+              <Svg width="20" height="20" viewBox="0 -960 960 960" fill="#f8fafc">
+                {fullscreenMode === "normal" ? (
+                  <Path d="M120-120v-200h80v120h120v80H120Zm520 0v-80h120v-120h80v200H640ZM120-640v-200h200v80H200v120h-80Zm640 0v-120H640v-80h200v200h-80Z"/>
+                ) : (
+                  <Path d="M200-200v-120h120v-80H120v200h80Zm520 0h80v-200H640v80h120v120ZM240-640H120v-200h80v120h120v80H240Zm480 0v-120H640v-80h200v200h-80Z"/>
+                )}
+              </Svg>
+            </Pressable>
           </View>
         </LinearGradient>
       </Animated.View>

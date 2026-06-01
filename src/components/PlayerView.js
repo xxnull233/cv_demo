@@ -20,7 +20,8 @@ export function PlayerView({
   onTimeUpdate,
   onFirstFrameRender,
   onError,
-  onFullscreenChange,
+  fullscreenMode,
+  onFullscreenToggle,
   contentFit = "contain",
   initialTime = 0,
 }) {
@@ -31,9 +32,14 @@ export function PlayerView({
     player.play();
   });
   const firstFrameDone = useRef(false);
+  const isInitialMount = useRef(true);
 
-  // 源变化时切换到新地址
+  // 源变化时切换到新地址（跳过首次挂载，避免与 useVideoPlayer initializer 冲突）
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     if (uri) {
       player.replace(uri);
       if (initialTime > 0) {
@@ -90,7 +96,8 @@ export function PlayerView({
         player={player}
         title={title}
         onBack={onBack}
-        onFullscreenChange={onFullscreenChange}
+        fullscreenMode={fullscreenMode}
+        onFullscreenToggle={onFullscreenToggle}
         style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
       />
     </View>

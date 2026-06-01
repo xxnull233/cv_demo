@@ -1,3 +1,4 @@
+import { useEvent } from "expo";
 import { useEffect, useRef, useState } from "react";
 import { Animated, PanResponder, Pressable, StatusBar, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -63,15 +64,14 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
     return function () { ScreenOrientation.unlockAsync().catch(function () {}); };
   }, []);
 
-  // ── 轮询缓冲状态 ──
+  // ── 缓冲状态 —— 事件驱动，取代轮询 ──
+  var statusEvent = useEvent(player, "statusChange", {
+    status: player?.status,
+  });
+  var currentPlayerStatus = statusEvent?.status || player?.status;
   useEffect(() => {
-    if (!player) return;
-    function tick() {
-      try { setBuffering(player.status === "loading"); } catch {}
-    }
-    var interval = setInterval(tick, 500);
-    return function () { clearInterval(interval); };
-  }, [player]);
+    setBuffering(currentPlayerStatus === "loading");
+  }, [currentPlayerStatus]);
 
   // ── 自动隐藏 ──
   useEffect(() => {
@@ -103,7 +103,7 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
     var now = Date.now();
     var last = lastClickRef.current;
     lastClickRef.current = now;
-    if (now - last < 350) {
+    if (now - last < 200) {
       if (clickTimer.current) clearTimeout(clickTimer.current);
       clickTimer.current = null;
       togglePlay();
@@ -114,7 +114,7 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
       if (showControls) { fadeOut(); }
       else { fadeIn(); }
       clickTimer.current = null;
-    }, 350);
+    }, 200);
   }
 
   // ── 全屏切换 ──
@@ -123,21 +123,21 @@ export function PlayerControls({ player, title, onBack, style, onFullscreenChang
     StatusBar.setHidden(true);
     setFullscreenMode("portrait");
     fullscreenModeRef.current = "portrait";
-    onFullscreenChange?.(true);
+    onFullscreenChange?.("portrait");
   }
   function enterLandscapeFS() {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(function () {});
     StatusBar.setHidden(true);
     setFullscreenMode("landscape");
     fullscreenModeRef.current = "landscape";
-    onFullscreenChange?.(true);
+    onFullscreenChange?.("landscape");
   }
   function exitFS() {
-    ScreenOrientation.unlockAsync().catch(function () {});
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
     StatusBar.setHidden(false);
     setFullscreenMode("normal");
     fullscreenModeRef.current = "normal";
-    onFullscreenChange?.(false);
+    onFullscreenChange?.("normal");
   }
   function handleBackPress() {
     if (fullscreenModeRef.current !== "normal") {

@@ -202,7 +202,7 @@ export function HlsVideo({
           var now = Date.now();
           var last = lastClickRef.current;
           lastClickRef.current = now;
-          if (now - last < 350) {
+          if (now - last < 200) {
             if (clickTimer.current) clearTimeout(clickTimer.current);
             clickTimer.current = null;
             e.stopPropagation();
@@ -213,7 +213,7 @@ export function HlsVideo({
           clickTimer.current = setTimeout(function () {
             toggleControls();
             clickTimer.current = null;
-          }, 350);
+          }, 200);
         }}
         onDoubleClick={function (e) { e.stopPropagation(); togglePlay(); }}
         onTouchStart={function (e) { handleSeekStart(e.touches[0].clientX); }}

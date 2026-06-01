@@ -21,6 +21,7 @@ export function PlayerView({
   onFirstFrameRender,
   onError,
   onFullscreenChange,
+  contentFit = "contain",
   initialTime = 0,
 }) {
   const player = useVideoPlayer(uri, (player) => {
@@ -82,7 +83,7 @@ export function PlayerView({
         player={player}
         style={{ flex: 1 }}
         nativeControls={false}
-        contentFit="contain"
+        contentFit={contentFit}
         onFirstFrameRender={handleFirstFrameRender}
       />
       <PlayerControls

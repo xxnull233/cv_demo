@@ -108,7 +108,8 @@ export function PlayerScreen() {
   const [filteredUri, setFilteredUri] = useState(null);
   const [mobileRetryKey, setMobileRetryKey] = useState(0);
   const [mobileError, setMobileError] = useState(false);
-  const [pageFullscreen, setPageFullscreen] = useState(false);
+  const [fullscreenMode, setFullscreenMode] = useState("normal"); // "normal" | "portrait" | "landscape"
+  const isFullscreen = fullscreenMode !== "normal";
   const mobileFileRef = useRef(null); // 缓存文件路径 (string)
   const mobileTimeRef = useRef(0); // PlayerView 定期同步 currentTime 到此 ref
   const lastSavedTimeRef = useRef(0); // 上次保存的播放时间，用于脏检查
@@ -294,7 +295,7 @@ export function PlayerScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ExpoStatusBar style="light" backgroundColor="#050505" translucent={false} />
-      <View style={[styles.videoWrapper, pageFullscreen && { flex: 1 }]}>
+      <View style={[styles.videoWrapper, fullscreenMode === "portrait" && { flex: 1, justifyContent: "center" }, fullscreenMode === "landscape" && { flex: 1 }]}>
         {isHlsOnWeb ? (
           <HlsVideo
             key={hlsRetryKey}
@@ -320,13 +321,14 @@ export function PlayerScreen() {
           <PlayerView
             key={`mobile-${mobileRetryKey}-${currentEpisode?.url || index}`}
             uri={filteredUri}
-            style={[styles.video, pageFullscreen && { aspectRatio: undefined, flex: 1 }]}
+            style={[styles.video, fullscreenMode === "landscape" && { aspectRatio: undefined, flex: 1 }]}
             title={currentDetail?.title}
             onBack={handleBack}
+            contentFit="contain"
             initialTime={savedPlaybackTime.current}
             onTimeUpdate={(t) => { mobileTimeRef.current = t; }}
             onError={setMobileError}
-            onFullscreenChange={setPageFullscreen}
+            onFullscreenChange={setFullscreenMode}
           />
         )}
 
@@ -340,7 +342,7 @@ export function PlayerScreen() {
         )}
       </View>
 
-      {!pageFullscreen && (
+      {fullscreenMode === "normal" && (
         <ScrollView style={styles.playerContent}>
         <Text style={styles.nowPlaying} numberOfLines={2}>
           {currentEpisode?.title || ("第 " + (currentEpisodeIndex + 1) + " 集")}

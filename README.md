@@ -98,6 +98,7 @@ npm run check            # Babel 编译检查 + 播放地址解析检查
 
 ### 其他说明
 
+- **移动端全屏**：点击播放器全屏按钮进入横屏沉浸式播放（隐藏状态栏与 Android 导航栏，视频铺满屏幕）；返回键或再次点击全屏按钮退出
 - 部分资源站可能因防盗链、TLS、线路失效或网络封锁而无法搜索/播放
 - HTTP 源已在 `app.json` 配置明文流量允许（`usesCleartextTraffic` / ATS）
 - 本地数据（历史、收藏、源设置）保存在 AsyncStorage，卸载 App 会丢失
@@ -124,7 +125,8 @@ cvdemo/
 │   ├── screens/           # 页面组件
 │   ├── styles/            # 样式文件
 │   ├── utils/
-│   │   └── m3u8Filter.js  # m3u8 广告过滤（无平台依赖）
+│   │   ├── m3u8Filter.js      # m3u8 广告过滤（无平台依赖）
+│   │   └── playerFullscreen.js # 移动端全屏系统 UI 管理
 │   └── storage.js         # AsyncStorage
 └── scripts/
     ├── proxy-server.mjs   # Web 代理（CORS + m3u8 广告过滤）

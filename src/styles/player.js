@@ -68,6 +68,12 @@ export const styles = StyleSheet.create({
 
   },
 
+  videoWrapperFullscreen: {
+
+    flex: 1
+
+  },
+
   video: {
 
     width: "100%",
@@ -75,6 +81,18 @@ export const styles = StyleSheet.create({
     aspectRatio: 16 / 9,
 
     backgroundColor: "#000"
+
+  },
+
+  videoFullscreen: {
+
+    aspectRatio: undefined,
+
+    flex: 1,
+
+    width: "100%",
+
+    height: "100%"
 
   },
 

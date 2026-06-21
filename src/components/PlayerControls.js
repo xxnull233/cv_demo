@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, PanResponder, Pressable, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
 /**
  * 播放器控制覆盖层 — 与 Web 端全功能同步
  */
 export function PlayerControls({ player, title, onBack, style, fullscreenMode, onFullscreenToggle }) {
+  const insets = useSafeAreaInsets();
+  const isFullscreen = fullscreenMode !== "normal";
   // ── 状态 ──
   const [isPlaying, setIsPlaying] = useState(player?.playing ?? false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -258,7 +261,11 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
       {/* 控件覆盖层 */}
       <Animated.View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: opacityAnim, zIndex: 10, justifyContent: "space-between" }, showControls ? {} : { display: "none" }]} pointerEvents="box-none">
         {/* 顶部栏 */}
-        <LinearGradient colors={["rgba(0,0,0,0.5)", "transparent"]} style={topBar}>
+        <LinearGradient colors={["rgba(0,0,0,0.5)", "transparent"]} style={[topBar, isFullscreen && {
+          paddingTop: Math.max(insets.top, 8),
+          paddingLeft: Math.max(insets.left, 12),
+          paddingRight: Math.max(insets.right, 12)
+        }]}>
           <Pressable style={backBtn} onPress={handleBackPress}>
             <Svg width="24" height="24" viewBox="0 0 24 24" fill="#f8fafc">
               <Path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
@@ -269,7 +276,11 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
         </LinearGradient>
 
         {/* 底部栏 */}
-        <LinearGradient colors={["transparent", "rgba(0,0,0,0.5)"]} style={bottomBar}>
+        <LinearGradient colors={["transparent", "rgba(0,0,0,0.5)"]} style={[bottomBar, isFullscreen && {
+          paddingBottom: Math.max(insets.bottom, 10),
+          paddingLeft: Math.max(insets.left, 10),
+          paddingRight: Math.max(insets.right, 10)
+        }]}>
           <View style={ctrlRow}>
             <Pressable onPress={togglePlay} style={iconBtn}>
               {isPlaying ? (

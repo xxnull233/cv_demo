@@ -38,6 +38,7 @@
       }
     },
     "plugins": [
+      "expo-screen-orientation",
       "expo-video",
       [
         "expo-build-properties",

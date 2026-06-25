@@ -362,7 +362,7 @@ export function PlayerScreen() {
           <PlayerView
             key={`mobile-${mobileRetryKey}-${currentEpisode?.url || 'unknown'}`}
             uri={filteredUri}
-            style={[styles.video, isFullscreen && styles.videoFullscreen]}
+            style={isFullscreen ? styles.videoFullscreen : styles.video}
             title={currentDetail?.title}
             onBack={handleBackPress}
             fullscreenMode={fullscreenMode}

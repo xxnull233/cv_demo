@@ -43,6 +43,9 @@
       [
         "expo-build-properties",
         {
+          "ios": {
+            "deploymentTarget": "13.0"
+          },
           "android": {
             "usesCleartextTraffic": true,
             "enableProguardInReleaseBuilds": true,

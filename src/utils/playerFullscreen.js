@@ -7,7 +7,7 @@ import * as ScreenOrientation from "expo-screen-orientation";
  */
 export async function enterPlayerFullscreen(mode) {
   if (mode === "landscape") {
-    await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(function () {});
+    await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_LEFT).catch(function () {});
   } else {
     await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(function () {});
   }

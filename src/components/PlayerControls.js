@@ -29,6 +29,8 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
   const seekStartTime = useRef(0);
   const seekingRef = useRef(false);
   const opacityAnim = useRef(new Animated.Value(1)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const progWidth = progressAnim.interpolate({ inputRange: [0, 100], outputRange: ["0%", "100%"] });
   const gestureStartX = useRef(0);
   const gestureSwiping = useRef(false);
   const seekTimeRef = useRef(0);
@@ -36,19 +38,32 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
   const durationRef = useRef(0);
   const playerRef = useRef(player);
   const shouldHideRef = useRef(true);
+  const justSeekedRef = useRef(false);
 
   // ── 轮询播放状态和时间 ──
   useEffect(() => {
     if (!player) return;
+    function animateToProgress(pct, dur) {
+      Animated.timing(progressAnim, {
+        toValue: pct,
+        duration: dur || 300,
+        useNativeDriver: false,
+      }).start();
+    }
     function tick() {
       try {
         setIsPlaying(player.playing);
-        var t = player.currentTime || 0;
         var d = player.duration || 0;
-        setCurrentTime(t);
         setDuration(d);
-        currentTimeRef.current = t;
         durationRef.current = d;
+        if (justSeekedRef.current) {
+          justSeekedRef.current = false;
+          return;
+        }
+        var t = player.currentTime || 0;
+        setCurrentTime(t);
+        currentTimeRef.current = t;
+        animateToProgress(d > 0 ? (t / d) * 100 : 0, 300);
       } catch {}
     }
     tick();
@@ -153,6 +168,7 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
     var computed = Math.max(0, Math.min(durationRef.current, seekStartTime.current + ratio * durationRef.current));
     setSeekTime(computed);
     seekTimeRef.current = computed;
+    progressAnim.setValue(durationRef.current > 0 ? (computed / durationRef.current) * 100 : 0);
   }
   function handleSeekEnd() {
     if (!seekingRef.current) return;
@@ -160,6 +176,8 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
     seekingRef.current = false;
     setSeeking(false);
     setCurrentTime(target);
+    currentTimeRef.current = target;
+    justSeekedRef.current = true;
     if (playerRef.current) playerRef.current.currentTime = target;
   }
 
@@ -188,9 +206,6 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
     try { player.playbackRate = val; } catch {}
     setShowSpeed(false);
   }
-
-  var progressRatio = duration > 0 ? (seeking ? seekTime / duration : currentTime / duration) : 0;
-  var displayPct = (progressRatio * 100).toFixed(1);
 
   return (
     <View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, style]} pointerEvents="box-none">
@@ -225,6 +240,7 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
             var computed = Math.max(0, Math.min(durationRef.current, seekStartTime.current + ratio * durationRef.current));
             setSeekTime(computed);
             seekTimeRef.current = computed;
+            progressAnim.setValue(durationRef.current > 0 ? (computed / durationRef.current) * 100 : 0);
           }
         }}
         onResponderRelease={() => {
@@ -233,6 +249,8 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
             seekingRef.current = false;
             setSeeking(false);
             setCurrentTime(target);
+            currentTimeRef.current = target;
+            justSeekedRef.current = true;
             if (playerRef.current) playerRef.current.currentTime = target;
           } else {
             handleTap();
@@ -304,9 +322,9 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
                 onResponderMove={function (e) { handleSeekMove(e.nativeEvent.pageX); }}
                 onResponderRelease={function () { handleSeekEnd(); }}
               >
-                <View style={[progFill, { width: displayPct + "%" }]} />
-                <View
-                  style={[progDot, { left: displayPct + "%" }]}
+                <Animated.View style={[progFill, { width: progWidth }]} />
+                <Animated.View
+                  style={[progDot, { left: progWidth }]}
                   {...dotPan.panHandlers}
                 />
               </View>
@@ -336,11 +354,11 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
 
             {/* 全屏切换按钮（普通模式→全屏，全屏模式下→退出） */}
             <Pressable onPress={onFullscreenToggle} style={iconBtn}>
-              <Svg width="20" height="20" viewBox="0 -960 960 960" fill="#f8fafc">
+              <Svg width="20" height="20" viewBox="0 0 24 24" fill="#f8fafc">
                 {fullscreenMode === "normal" ? (
-                  <Path d="M120-120v-200h80v120h120v80H120Zm520 0v-80h120v-120h80v200H640ZM120-640v-200h200v80H200v120h-80Zm640 0v-120H640v-80h200v200h-80Z"/>
+                  <Path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
                 ) : (
-                  <Path d="M200-200v-120h120v-80H120v200h80Zm520 0h80v-200H640v80h120v120ZM240-640H120v-200h80v120h120v80H240Zm480 0v-120H640v-80h200v200h-80Z"/>
+                  <Path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
                 )}
               </Svg>
             </Pressable>
@@ -351,7 +369,7 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
       {/* 隐藏时的底部细进度条（仅普通模式显示） */}
       {!showControls && fullscreenMode === "normal" && (
         <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 3, zIndex: 5 }}>
-          <View style={{ height: "100%", width: displayPct + "%", backgroundColor: "#38bdf8" }} />
+          <Animated.View style={{ height: "100%", width: progWidth, backgroundColor: "#38bdf8" }} />
         </View>
       )}
     </View>
@@ -388,7 +406,7 @@ var progTrack = { height: 6, backgroundColor: "rgba(255,255,255,0.25)", borderRa
 var progFill = { height: "100%", backgroundColor: "#38bdf8", borderRadius: 2 };
 var progDot = { position: "absolute", top: "50%", width: 14, height: 14, borderRadius: 7, backgroundColor: "#38bdf8", transform: [{ translateX: -7 }, { translateY: -7 }] };
 
-var timeText = { color: "#9ca3af", fontSize: 11, fontWeight: "600", letterSpacing: -0.3 };
+var timeText = { width: 100, textAlign: "right", color: "#9ca3af", fontSize: 11, fontWeight: "600", letterSpacing: -0.3 };
 
 var speedBtn = { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.08)" };
 var speedBtnText = { color: "#f8fafc", fontSize: 12, fontWeight: "700" };

@@ -35,7 +35,10 @@ jobs:
         run: npx expo prebuild --platform ios --clean
 
       - name: Install CocoaPods
-        run: pod install --project-directory=ios
+        run: |
+          pod install --project-directory=ios
+          # fmt 旧版本与 Xcode 26.5 Clang 不兼容，升级到兼容版本
+          pod update fmt --project-directory=ios
 
       - name: Build unsigned release .app
         run: |

@@ -35,10 +35,19 @@ jobs:
         run: npx expo prebuild --platform ios --clean
 
       - name: Install CocoaPods
+        run: pod install --project-directory=ios
+
+      - name: Patch fmt library for Xcode 26.5 Clang compatibility
         run: |
-          pod install --project-directory=ios
-          # fmt 旧版本与 Xcode 26.5 Clang 不兼容，升级到兼容版本
-          pod update fmt --project-directory=ios
+          FMT_HEADER="ios/Pods/fmt/include/fmt/format.h"
+          if [ -f "$FMT_HEADER" ]; then
+            # FMT_STRING 宏使用 GCC 扩展写法，Xcode 26.5 Clang 报错
+            # 替换为简单实现（放弃编译期字面量校验，不影响运行行为）
+            sed -i '' 's/#define FMT_STRING(s) FMT_STRING_IMPL(s, fmt::detail::compile_string, )/#define FMT_STRING(s) s/' "$FMT_HEADER"
+            echo "patched FMT_STRING macro in $FMT_HEADER"
+          else
+            echo "WARNING: fmt header not found, skipping patch"
+          fi
 
       - name: Build unsigned release .app
         run: |

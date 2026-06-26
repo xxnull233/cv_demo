@@ -394,7 +394,7 @@ var topBar = { paddingTop: 8, paddingHorizontal: 12, paddingBottom: 14, flexDire
 var backBtn = { paddingVertical: 6, paddingRight: 8 };
 var topTitle = { flex: 1, color: "#f8fafc", fontSize: 15, fontWeight: "700" };
 
-var bottomBar = { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10 };
+var bottomBar = { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10, overflow: "visible" };
 var ctrlRow = { flexDirection: "row", alignItems: "center", gap: 8 };
 
 var iconBtn = { padding: 4 };

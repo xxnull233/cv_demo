@@ -70,7 +70,8 @@ export const styles = StyleSheet.create({
 
   videoWrapperFullscreen: {
 
-    flex: 1
+    flex: 1,
+    alignItems: "center"
 
   },
 
@@ -86,9 +87,9 @@ export const styles = StyleSheet.create({
 
   videoFullscreen: {
 
-    flex: 1,
+    height: "100%",
 
-    width: "100%",
+    aspectRatio: 16 / 9,
 
     backgroundColor: "#000"
 

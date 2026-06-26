@@ -367,7 +367,7 @@ export function PlayerScreen() {
             onBack={handleBackPress}
             fullscreenMode={fullscreenMode}
             onFullscreenToggle={handleFullscreenToggle}
-            contentFit={isFullscreen ? "cover" : "contain"}
+            contentFit="contain"
             initialTime={savedPlaybackTime.current}
             onTimeUpdate={(t) => { mobileTimeRef.current = t; }}
             onError={setMobileError}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, PanResponder, Pressable, Text, View } from "react-native";
+import { Animated, PanResponder, Pressable, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
@@ -39,8 +39,6 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
   const playerRef = useRef(player);
   const shouldHideRef = useRef(true);
   const justSeekedRef = useRef(false);
-  const speedBtnRef = useRef(null);
-  const [speedPopupPos, setSpeedPopupPos] = useState(null);
 
   // ── 轮询播放状态和时间 ──
   useEffect(() => {
@@ -110,21 +108,6 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
     setShowControls(true);
     Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
   }
-
-  // ── 倍速弹窗位置测量（iOS 避免窄父容器裁剪）──
-  useEffect(() => {
-    if (!showSpeed) { setSpeedPopupPos(null); return; }
-    if (!speedBtnRef.current) return;
-    try {
-      speedBtnRef.current.measureInWindow(function (x, y, w, h) {
-        var win = Dimensions.get("window");
-        setSpeedPopupPos({
-          right: win.width - x - w,
-          bottom: win.height - y + 4,
-        });
-      });
-    } catch (e) {}
-  }, [showSpeed]);
 
   // ── 播放/暂停 ──
   function togglePlay() {
@@ -346,10 +329,22 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
             <Text style={timeText}>{fmt(currentTime)}/{fmt(duration)}</Text>
 
             {/* 倍速 */}
-            <View ref={speedBtnRef} style={{ position: "relative" }}>
-              <Pressable onPress={function () { setShowSpeed(function (v) { return !v; }); }} style={speedBtn}>
+            <View style={{ position: "relative" }}>
+              <Pressable onPress={function () { setShowSpeed(true); }} style={speedBtn}>
                 <Text style={speedBtnText}>{speed}x</Text>
               </Pressable>
+              {showSpeed && (
+                <View style={speedOptionsRow}>
+                  {SPEEDS.map(function (s) {
+                    var a = s === speed;
+                    return (
+                      <Pressable key={s} onPress={function () { selectSpeed(s); }} style={[speedOpt, a && speedOptActive]}>
+                        <Text style={[speedOptText, a && speedOptTextActive]}>{s}x</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
             </View>
 
             {/* 全屏切换按钮（普通模式→全屏，全屏模式下→退出） */}
@@ -365,20 +360,6 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
           </View>
         </LinearGradient>
       </Animated.View>
-
-      {/* 倍速弹窗（root 层渲染，避免 iOS 窄父容器裁剪） */}
-      {showSpeed && speedPopupPos && (
-        <View style={[speedPopup, { position: "absolute", right: speedPopupPos.right, bottom: speedPopupPos.bottom }]}>
-          {SPEEDS.map(function (s) {
-            var a = s === speed;
-            return (
-              <Pressable key={s} onPress={function () { selectSpeed(s); }} style={[speedOpt, a && speedOptActive]}>
-                <Text style={[speedOptText, a && speedOptTextActive]}>{s}x</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
 
       {/* 隐藏时的底部细进度条（仅普通模式显示） */}
       {!showControls && fullscreenMode === "normal" && (
@@ -420,12 +401,12 @@ var progTrack = { height: 6, backgroundColor: "rgba(255,255,255,0.25)", borderRa
 var progFill = { height: "100%", backgroundColor: "#38bdf8", borderRadius: 2 };
 var progDot = { position: "absolute", top: "50%", width: 14, height: 14, borderRadius: 7, backgroundColor: "#38bdf8", transform: [{ translateX: -7 }, { translateY: -7 }] };
 
-var timeText = { width: 70, textAlign: "right", color: "#9ca3af", fontSize: 11, fontWeight: "600", letterSpacing: -0.3 };
+var timeText = { width: 60, textAlign: "right", color: "#9ca3af", fontSize: 11, fontWeight: "600", letterSpacing: -0.3 };
 
-var speedBtn = { width: 55, paddingVertical: 2, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center" };
+var speedBtn = { width: 45, paddingVertical: 2, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center" };
 var speedBtnText = { color: "#f8fafc", fontSize: 12, fontWeight: "700" };
-var speedPopup = { minWidth: 72, backgroundColor: "rgba(15,15,15,0.96)", borderRadius: 8, overflow: "hidden", zIndex: 40 };
-var speedOpt = { paddingHorizontal: 16, paddingVertical: 8 };
-var speedOptActive = { backgroundColor: "rgba(56,189,248,0.15)" };
-var speedOptText = { color: "#f8fafc", fontSize: 13, fontWeight: "400" };
+var speedOptionsRow = { position: "absolute", bottom: "100%", left: 0, flexDirection: "column", gap: 2, marginBottom: 4 };
+var speedOpt = { paddingHorizontal: 5, paddingVertical: 3, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.06)" };
+var speedOptActive = { backgroundColor: "rgba(56,189,248,0.2)" };
+var speedOptText = { color: "#9ca3af", fontSize: 11, fontWeight: "600" };
 var speedOptTextActive = { color: "#38bdf8", fontWeight: "700" };

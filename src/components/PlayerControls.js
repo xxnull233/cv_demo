@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, PanResponder, Pressable, Text, View } from "react-native";
+import { Animated, PanResponder, Pressable, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
@@ -40,6 +40,7 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
   const shouldHideRef = useRef(true);
   const justSeekedRef = useRef(false);
   const speedBtnRef = useRef(null);
+  const rootRef = useRef(null);
   const [speedOptPos, setSpeedOptPos] = useState(null);
 
   // ── 轮询播放状态和时间 ──
@@ -116,13 +117,17 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
   // ── 倍速选项定位 ──
   useEffect(() => {
     if (!showSpeed) { setSpeedOptPos(null); return; }
-    if (!speedBtnRef.current) return;
+    if (!speedBtnRef.current || !rootRef.current) return;
     try {
-      speedBtnRef.current.measureInWindow(function (x, y, w, h) {
-        var win = Dimensions.get("window");
-        setSpeedOptPos({
-          right: win.width - x - w,
-          bottom: win.height - y + 4,
+      rootRef.current.measureInWindow(function (rootX, rootY, rootW, rootH) {
+        if (!speedBtnRef.current) return;
+        speedBtnRef.current.measureInWindow(function (btnX, btnY, btnW, btnH) {
+          var relX = btnX - rootX;
+          var relY = btnY - rootY;
+          setSpeedOptPos({
+            right: rootW - relX - btnW,
+            bottom: rootH - relY + 4,
+          });
         });
       });
     } catch (e) {}
@@ -222,7 +227,7 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
   }
 
   return (
-    <View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, style]} pointerEvents="box-none">
+    <View ref={rootRef} style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, style]} pointerEvents="box-none">
       {/* 全屏手势处理 —— 点击 + 滑动 */}
       <View
         style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
@@ -348,9 +353,11 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
             <Text style={timeText}>{fmt(currentTime)}/{fmt(duration)}</Text>
 
             {/* 倍速 */}
-            <Pressable ref={speedBtnRef} onPress={function () { setShowSpeed(function (v) { return !v; }); }} style={speedBtn}>
-              <Text style={speedBtnText}>{speed}x</Text>
-            </Pressable>
+            <View ref={speedBtnRef} style={{ width: 45 }}>
+              <Pressable onPress={function () { setShowSpeed(function (v) { return !v; }); }} style={speedBtn}>
+                <Text style={speedBtnText}>{speed}x</Text>
+              </Pressable>
+            </View>
 
             {/* 全屏切换按钮（普通模式→全屏，全屏模式下→退出） */}
             <Pressable onPress={onFullscreenToggle} style={iconBtn}>
@@ -380,10 +387,10 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
         </View>
       )}
 
-      {/* 隐藏时的底部细进度条（仅普通模式显示） */}
-      {!showControls && fullscreenMode === "normal" && (
+      {/* 隐藏时的底部细进度条 */}
+      {!showControls && (
         <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 3, zIndex: 5 }}>
-          <Animated.View style={{ height: "100%", width: progWidth, backgroundColor: "#38bdf8" }} />
+          <Animated.View style={{ height: "100%", width: progWidth, backgroundColor: "#eab308" }} />
         </View>
       )}
     </View>
@@ -417,15 +424,15 @@ var iconBtn = { padding: 4 };
 
 var progWrap = { flex: 1 };
 var progTrack = { height: 6, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 3, position: "relative", justifyContent: "center" };
-var progFill = { height: "100%", backgroundColor: "#38bdf8", borderRadius: 2 };
-var progDot = { position: "absolute", top: "50%", width: 14, height: 14, borderRadius: 7, backgroundColor: "#38bdf8", transform: [{ translateX: -7 }, { translateY: -7 }] };
+var progFill = { height: "100%", backgroundColor: "#eab308", borderRadius: 2 };
+var progDot = { position: "absolute", top: "50%", width: 14, height: 14, borderRadius: 7, backgroundColor: "#eab308", transform: [{ translateX: -7 }, { translateY: -7 }] };
 
-var timeText = { width: 65, textAlign: "right", color: "#9ca3af", fontSize: 11, fontWeight: "600", letterSpacing: -0.3 };
+var timeText = { width: 70, textAlign: "right", color: "#9ca3af", fontSize: 11, fontWeight: "600", letterSpacing: -0.3 };
 
 var speedBtn = { width: 45, paddingVertical: 2, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center" };
 var speedBtnText = { color: "#f8fafc", fontSize: 12, fontWeight: "700" };
 var speedOptionsRow = { flexDirection: "column", gap: 2, zIndex: 40 };
 var speedOpt = { paddingHorizontal: 5, paddingVertical: 3, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.06)" };
-var speedOptActive = { backgroundColor: "rgba(56,189,248,0.2)" };
+var speedOptActive = { backgroundColor: "rgba(234,179,8,0.2)" };
 var speedOptText = { color: "#9ca3af", fontSize: 11, fontWeight: "600" };
-var speedOptTextActive = { color: "#38bdf8", fontWeight: "700" };
+var speedOptTextActive = { color: "#eab308", fontWeight: "700" };

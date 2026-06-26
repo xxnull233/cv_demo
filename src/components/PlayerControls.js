@@ -39,9 +39,7 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
   const playerRef = useRef(player);
   const shouldHideRef = useRef(true);
   const justSeekedRef = useRef(false);
-  const speedBtnRef = useRef(null);
   const rootRef = useRef(null);
-  const [speedOptPos, setSpeedOptPos] = useState(null);
 
   // ── 轮询播放状态和时间 ──
   useEffect(() => {
@@ -113,25 +111,6 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
     setShowControls(true);
     Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
   }
-
-  // ── 倍速选项定位 ──
-  useEffect(() => {
-    if (!showSpeed) { setSpeedOptPos(null); return; }
-    if (!speedBtnRef.current || !rootRef.current) return;
-    try {
-      rootRef.current.measureInWindow(function (rootX, rootY, rootW, rootH) {
-        if (!speedBtnRef.current) return;
-        speedBtnRef.current.measureInWindow(function (btnX, btnY, btnW, btnH) {
-          var relX = btnX - rootX;
-          var relY = btnY - rootY;
-          setSpeedOptPos({
-            right: rootW - relX - btnW,
-            bottom: rootH - relY + 4,
-          });
-        });
-      });
-    } catch (e) {}
-  }, [showSpeed]);
 
   // ── 播放/暂停 ──
   function togglePlay() {
@@ -353,10 +332,22 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
             <Text style={timeText}>{fmt(currentTime)}/{fmt(duration)}</Text>
 
             {/* 倍速 */}
-            <View ref={speedBtnRef} style={{ width: 45 }}>
+            <View style={{ width: 45 }}>
               <Pressable onPress={function () { setShowSpeed(function (v) { return !v; }); }} style={speedBtn}>
                 <Text style={speedBtnText}>{speed}x</Text>
               </Pressable>
+              {showSpeed && (
+                <View style={[speedOptionsRow, { position: "absolute", bottom: "100%", right: 0 }]}>
+                  {SPEEDS.map(function (s) {
+                    var a = s === speed;
+                    return (
+                      <Pressable key={s} onPress={function () { selectSpeed(s); }} style={[speedOpt, a && speedOptActive]}>
+                        <Text style={[speedOptText, a && speedOptTextActive]}>{s}x</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
             </View>
 
             {/* 全屏切换按钮（普通模式→全屏，全屏模式下→退出） */}
@@ -372,20 +363,6 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
           </View>
         </LinearGradient>
       </Animated.View>
-
-      {/* 倍速选项列（root 层渲染） */}
-      {showSpeed && speedOptPos && (
-        <View style={[speedOptionsRow, { position: "absolute", right: speedOptPos.right, bottom: speedOptPos.bottom }]}>
-          {SPEEDS.map(function (s) {
-            var a = s === speed;
-            return (
-              <Pressable key={s} onPress={function () { selectSpeed(s); }} style={[speedOpt, a && speedOptActive]}>
-                <Text style={[speedOptText, a && speedOptTextActive]}>{s}x</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
 
       {/* 隐藏时的底部细进度条 */}
       {!showControls && (
@@ -427,7 +404,7 @@ var progTrack = { height: 6, backgroundColor: "rgba(255,255,255,0.25)", borderRa
 var progFill = { height: "100%", backgroundColor: "#eab308", borderRadius: 2 };
 var progDot = { position: "absolute", top: "50%", width: 14, height: 14, borderRadius: 7, backgroundColor: "#eab308", transform: [{ translateX: -7 }, { translateY: -7 }] };
 
-var timeText = { width: 70, textAlign: "right", color: "#9ca3af", fontSize: 11, fontWeight: "600", letterSpacing: -0.3 };
+var timeText = { width: 75, textAlign: "right", color: "#9ca3af", fontSize: 11, fontWeight: "600", letterSpacing: -0.3 };
 
 var speedBtn = { width: 45, paddingVertical: 2, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center" };
 var speedBtnText = { color: "#f8fafc", fontSize: 12, fontWeight: "700" };

@@ -227,7 +227,7 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
             }
             setShowSpeed(false);
             setSeeking(true);
-            setShowControls(true);
+            if (showControls) fadeIn();
             seekStartX.current = x;
             seekStartTime.current = currentTimeRef.current;
             seekingRef.current = true;
@@ -408,8 +408,8 @@ var timeText = { width: 75, textAlign: "right", color: "#9ca3af", fontSize: 11, 
 
 var speedBtn = { width: 45, paddingVertical: 2, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center" };
 var speedBtnText = { color: "#f8fafc", fontSize: 12, fontWeight: "700" };
-var speedOptionsRow = { flexDirection: "column", gap: 2, zIndex: 40 };
-var speedOpt = { paddingHorizontal: 5, paddingVertical: 3, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.06)" };
+var speedOptionsRow = { flexDirection: "column", gap: 4, zIndex: 40 };
+var speedOpt = { paddingHorizontal: 8, paddingVertical: 6, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.08)" };
 var speedOptActive = { backgroundColor: "rgba(234,179,8,0.2)" };
-var speedOptText = { color: "#9ca3af", fontSize: 11, fontWeight: "600" };
+var speedOptText = { color: "#9ca3af", fontSize: 13, fontWeight: "600" };
 var speedOptTextActive = { color: "#eab308", fontWeight: "700" };

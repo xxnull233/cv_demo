@@ -405,10 +405,10 @@ var progDot = { position: "absolute", top: "50%", width: 14, height: 14, borderR
 
 var timeText = { width: 75, textAlign: "right", color: "#9ca3af", fontSize: 11, fontWeight: "600", letterSpacing: -0.3 };
 
-var speedBtn = { width: 45, paddingVertical: 2, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center" };
+var speedBtn = { width: 45, paddingVertical: 2, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center" };
 var speedBtnText = { color: "#f8fafc", fontSize: 12, fontWeight: "700", textAlign: "center" };
 var speedOptionsRow = { flexDirection: "column", gap: 4, zIndex: 40, width: 45 };
-var speedOpt = { paddingHorizontal: 4, paddingVertical: 6, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.15)" };
-var speedOptActive = { backgroundColor: "rgba(234,179,8,0.2)" };
+var speedOpt = { paddingHorizontal: 4, paddingVertical: 6, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.25)" };
+var speedOptActive = { backgroundColor: "rgba(234,179,8,0.25)" };
 var speedOptText = { color: "#9ca3af", fontSize: 13, fontWeight: "600", textAlign: "center" };
-var speedOptTextActive = { color: "#eab308", fontWeight: "700" };
+var speedOptTextActive = { color: "#eab308" };

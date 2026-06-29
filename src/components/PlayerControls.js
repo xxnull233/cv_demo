@@ -278,7 +278,6 @@ export function PlayerControls({ player, title, onBack, style, fullscreenMode, o
       <Animated.View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: opacityAnim, zIndex: 10, justifyContent: "space-between" }, showControls ? {} : { display: "none" }]} pointerEvents="box-none">
         {/* 顶部栏 */}
         <LinearGradient colors={["rgba(0,0,0,0.5)", "transparent"]} style={[topBar, isFullscreen && {
-          paddingTop: Math.max(insets.top, 8),
           paddingLeft: Math.max(insets.left, 12),
           paddingRight: Math.max(insets.right, 12)
         }]}>
@@ -406,10 +405,10 @@ var progDot = { position: "absolute", top: "50%", width: 14, height: 14, borderR
 
 var timeText = { width: 75, textAlign: "right", color: "#9ca3af", fontSize: 11, fontWeight: "600", letterSpacing: -0.3 };
 
-var speedBtn = { width: 45, paddingVertical: 2, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center" };
+var speedBtn = { width: 45, paddingVertical: 2, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center" };
 var speedBtnText = { color: "#f8fafc", fontSize: 12, fontWeight: "700" };
-var speedOptionsRow = { flexDirection: "column", gap: 4, zIndex: 40 };
-var speedOpt = { paddingHorizontal: 8, paddingVertical: 6, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.08)" };
+var speedOptionsRow = { flexDirection: "column", gap: 4, zIndex: 40, alignItems: "flex-start" };
+var speedOpt = { paddingHorizontal: 8, paddingVertical: 6, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.15)" };
 var speedOptActive = { backgroundColor: "rgba(234,179,8,0.2)" };
 var speedOptText = { color: "#9ca3af", fontSize: 13, fontWeight: "600" };
 var speedOptTextActive = { color: "#eab308", fontWeight: "700" };
